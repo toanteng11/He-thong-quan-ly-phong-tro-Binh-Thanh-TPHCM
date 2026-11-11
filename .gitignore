@@ -1,0 +1,26 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependencies and build artifacts
+**/node_modules/
+**/dist/
+**/coverage/
+
+# Local uploaded media and application data
+/uploads/
+/server/uploads/
+*.dump
+*.sql.gz
+
+# Logs and operating system files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Local editor state
+.idea/
+.vscode/

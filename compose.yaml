@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:18
+    container_name: room-rental-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: room_rental_dev
+      POSTGRES_USER: room_rental_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U room_rental_app -d room_rental_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
