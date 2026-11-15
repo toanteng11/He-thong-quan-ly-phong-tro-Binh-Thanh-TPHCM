@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://phongtro-binhthanh-api.onrender.com/api/$1"
+      "destination": "https://he-thong-quan-ly-phong-tro-binh-thanh.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
