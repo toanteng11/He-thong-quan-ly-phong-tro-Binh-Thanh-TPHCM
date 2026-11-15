@@ -12,6 +12,7 @@
 # Local uploaded media and application data
 /uploads/
 /server/uploads/
+/server/uploads-perf/
 *.dump
 *.sql.gz
 

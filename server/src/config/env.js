@@ -14,6 +14,7 @@ const envSchema = z.object({
       "MONGODB_URI must start with mongodb:// or mongodb+srv://",
     ),
   MONGODB_DB_NAME: z.string().trim().min(1).default("room_rental_dev"),
+  UPLOAD_DIR: z.string().trim().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

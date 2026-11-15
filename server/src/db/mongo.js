@@ -81,6 +81,14 @@ async function ensureIndexes() {
       { publishStatus: 1, deletedAt: 1, roomType: 1, priceVnd: 1 },
       { name: "idx_public_rooms_type_price" },
     ),
+    roomListings.createIndex(
+      { publishStatus: 1, deletedAt: 1, areaM2: 1, priceVnd: 1 },
+      { name: "idx_public_rooms_area" },
+    ),
+    roomListings.createIndex(
+      { publishStatus: 1, deletedAt: 1, amenities: 1 },
+      { name: "idx_public_rooms_amenities" },
+    ),
     roomListings.createIndex({ deletedAt: 1, updatedAt: -1 }, { name: "idx_admin_rooms_updated" }),
     roomListings.createIndex({ _id: 1, "images.id": 1 }, { name: "idx_room_image_lookup" }),
     auditEvents.createIndex({ createdAt: -1 }, { name: "idx_audit_created_at" }),

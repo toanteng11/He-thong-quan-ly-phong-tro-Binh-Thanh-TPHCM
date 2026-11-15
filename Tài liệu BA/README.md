@@ -57,6 +57,9 @@ Thiếu các đầu vào này thì có thể hoàn thiện trên staging, nhưng
 - [Tổng quan kế hoạch triển khai](<../Tài liệu triển khai/README.md>) — lộ trình tổng thể Sprint 0–4 và nguyên tắc áp dụng.
 - [Tài liệu triển khai Sprint 0](<../Tài liệu triển khai/Sprint_0_Setup.md>) — setup môi trường/công cụ local là bước khởi đầu; không thay thế triển khai, bảo mật và nghiệm thu production.
 - [Tài liệu triển khai Sprint 1](<../Tài liệu triển khai/Sprint_1_Admin_Quan_ly_Tin_Phong.md>) — xây dựng khu quản trị, xác thực phiên admin, CRUD tin phòng, quản lý ảnh và quy chuẩn Design Tokens.
+- [Tài liệu triển khai Sprint 2](<../Tài liệu triển khai/Sprint_2_Khach_Xem_Danh_Sach_Chi_Tiet.md>) — xây dựng hệ thống khách hàng độc lập, Public API, tìm kiếm/lọc/chi tiết phòng và cách ly dữ liệu riêng tư.
+- [Tài liệu triển khai Sprint 3](<../Tài liệu triển khai/Sprint_3_Tim_Kiem_Loc_Nang_Cao_Toi_Uu_UX_Hieu_Nang.md>) — bộ lọc nâng cao (gồm tiện nghi & 5 phường Bình Thạnh 2026), tối ưu ảnh/cache/chỉ mục MongoDB 8 và nghiệm thu hiệu năng 500 tin (`p75 ≤ 3s`).
+- [Tài liệu triển khai Sprint 4](<../Tài liệu triển khai/Sprint_4_Nghiem_Thu_Trien_Khai_Production_Go_Live.md>) — hardening bảo mật production, sao lưu/khôi phục (7 daily + 4 weekly), đối chiếu toàn bộ AT-01–AT-49, nhập dữ liệu thật và bàn giao vận hành Go-Live.
 
 ## Quy ước và trạng thái quyết định
 

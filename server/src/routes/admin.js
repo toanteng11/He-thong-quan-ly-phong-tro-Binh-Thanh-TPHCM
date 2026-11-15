@@ -31,7 +31,7 @@ const optionalPositiveInteger = z.number().int().positive().max(Number.MAX_SAFE_
 const optionalPositiveArea = z.number().positive().max(100000).nullable();
 const ROOM_TYPES = ["", "Phòng trọ", "Phòng có gác", "Phòng studio", "Căn hộ mini", "Phòng ở ghép"];
 const AMENITIES = [
-  "Máy lạnh", "Tủ lạnh", "Máy giặt", "Giường", "Tủ quần áo", "Bếp riêng",
+  "Máy lạnh", "Tủ lạnh", "Thang máy", "Giường", "Tủ quần áo", "Bếp riêng",
   "Nhà vệ sinh riêng", "Ban công", "Gác lửng", "Wifi", "Chỗ để xe", "Cửa sổ",
 ];
 

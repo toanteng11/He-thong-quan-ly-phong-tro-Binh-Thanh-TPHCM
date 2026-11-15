@@ -6,8 +6,15 @@ const { imageStorage } = require("../storage/image-storage");
 const router = Router();
 
 const ROOM_TYPES = ["Phòng trọ", "Phòng có gác", "Phòng studio", "Căn hộ mini", "Phòng ở ghép"];
+const BINH_THANH_2026_WARDS = [
+  "Phường Gia Định",
+  "Phường Bình Thạnh",
+  "Phường Bình Lợi Trung",
+  "Phường Thạnh Mỹ Tây",
+  "Phường Bình Quới",
+];
 const AMENITIES = [
-  "Máy lạnh", "Tủ lạnh", "Máy giặt", "Giường", "Tủ quần áo", "Bếp riêng",
+  "Máy lạnh", "Tủ lạnh", "Thang máy", "Giường", "Tủ quần áo", "Bếp riêng",
   "Nhà vệ sinh riêng", "Ban công", "Gác lửng", "Wifi", "Chỗ để xe", "Cửa sổ",
 ];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -37,10 +44,22 @@ function sortImages(images = []) {
 
 const emptyToUndefined = (value) => (value === "" || value === null || value === undefined ? undefined : value);
 
+function parseAmenitiesQuery(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const rawList = Array.isArray(value) ? value : [value];
+  const split = rawList
+    .flatMap((entry) => String(entry).split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!split.length) return undefined;
+  return [...new Set(split)];
+}
+
 const querySchema = z.object({
   q: z.string().trim().max(100).optional().default(""),
   ward: z.string().trim().max(120).optional().default(""),
   roomType: z.preprocess(emptyToUndefined, z.enum(ROOM_TYPES).optional()),
+  amenities: z.preprocess(parseAmenitiesQuery, z.array(z.enum(AMENITIES)).max(AMENITIES.length).optional().default([])),
   minPriceVnd: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional()),
   maxPriceVnd: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional()),
   minAreaM2: z.preprocess(emptyToUndefined, z.coerce.number().positive().max(100000).optional()),
@@ -170,10 +189,15 @@ router.get("/rooms", async (request, response, next) => {
       ];
     }
     if (filter.ward) {
-      match.ward = new RegExp(`^${escapeRegex(filter.ward)}$`, "i");
+      const normalizedWard = filter.ward.toLocaleLowerCase("vi");
+      const canonicalWard = BINH_THANH_2026_WARDS.find((w) => w.toLocaleLowerCase("vi") === normalizedWard);
+      match.ward = canonicalWard || new RegExp(`^${escapeRegex(filter.ward)}$`, "i");
     }
     if (filter.roomType) {
       match.roomType = filter.roomType;
+    }
+    if (filter.amenities.length > 0) {
+      match.amenities = { $all: filter.amenities };
     }
     if (filter.minPriceVnd !== undefined || filter.maxPriceVnd !== undefined) {
       match.priceVnd = {};
@@ -280,7 +304,7 @@ router.get("/rooms/:roomId/images/:imageId/file", async (request, response, next
         deletedAt: null,
         "images.id": request.params.imageId,
       },
-      { projection: { images: { $elemMatch: { id: request.params.imageId } } } },
+      { projection: { updatedAt: 1, images: { $elemMatch: { id: request.params.imageId } } } },
     );
 
     const image = doc?.images?.[0];
@@ -288,11 +312,22 @@ router.get("/rooms/:roomId/images/:imageId/file", async (request, response, next
       return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy ảnh.");
     }
 
+    const updatedMs = new Date(doc.updatedAt || image.createdAt || 0).getTime();
+    const etag = `W/"${image.id}-${image.sizeBytes || 0}-${Number.isFinite(updatedMs) ? updatedMs : 0}"`;
+    response.setHeader("ETag", etag);
+    if (Number.isFinite(updatedMs) && updatedMs > 0) {
+      response.setHeader("Last-Modified", new Date(updatedMs).toUTCString());
+    }
+    response.setHeader("Cache-Control", "public, max-age=60");
+    response.setHeader("X-Content-Type-Options", "nosniff");
+
+    if (request.headers["if-none-match"] === etag) {
+      return response.status(304).end();
+    }
+
     const filePath = imageStorage.getPath({ listingId: request.params.roomId, storageKey: image.storageKey });
     response.setHeader("Content-Type", image.mimeType);
     response.setHeader("Content-Disposition", 'inline; filename="room-image"');
-    response.setHeader("Cache-Control", "public, max-age=60");
-    response.setHeader("X-Content-Type-Options", "nosniff");
     return response.sendFile(filePath, (error) => {
       if (error && !response.headersSent) next(error);
     });

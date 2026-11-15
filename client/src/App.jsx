@@ -5,12 +5,18 @@ import { branding } from './branding.js'
 import './App.css'
 
 const ROOM_TYPES = ['Phòng trọ', 'Phòng có gác', 'Phòng studio', 'Căn hộ mini', 'Phòng ở ghép']
+const DEFAULT_AMENITIES = [
+  'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
+  'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',
+]
+const QUICK_AMENITIES = ['Máy lạnh', 'Thang máy', 'Ban công', 'Gác lửng', 'Bếp riêng', 'Chỗ để xe']
 
 const defaultPublicFilters = {
   q: '',
   ward: '',
   roomType: '',
   availability: '',
+  amenities: [],
   minPriceVnd: '',
   maxPriceVnd: '',
   minAreaM2: '',
@@ -42,6 +48,15 @@ function buildZaloHref(raw) {
   return `https://zalo.me/${digits}`
 }
 
+function parseAmenitiesParam(params) {
+  const raw = params.getAll('amenities')
+  const items = raw
+    .flatMap((entry) => String(entry).split(','))
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return [...new Set(items)]
+}
+
 function parsePublicLocationState(search) {
   const params = new URLSearchParams(search || '')
   const pageNum = Number(params.get('page') || '1')
@@ -52,6 +67,7 @@ function parsePublicLocationState(search) {
       ward: params.get('ward') || '',
       roomType: params.get('roomType') || '',
       availability: params.get('availability') || '',
+      amenities: parseAmenitiesParam(params),
       minPriceVnd: params.get('minPriceVnd') || '',
       maxPriceVnd: params.get('maxPriceVnd') || '',
       minAreaM2: params.get('minAreaM2') || '',
@@ -64,6 +80,12 @@ function parsePublicLocationState(search) {
 function buildPublicQueryString(filters, page) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([key, value]) => {
+    if (key === 'amenities') {
+      if (Array.isArray(value) && value.length > 0) {
+        params.set('amenities', value.join(','))
+      }
+      return
+    }
     if (value && !(key === 'sort' && value === 'available_first_publishedAt_desc')) {
       params.set(key, String(value))
     }
@@ -152,7 +174,7 @@ function AppLink({ to, navigate, className, children, onClick, ...props }) {
   )
 }
 
-function SafeImage({ src, alt, className, fallbackLabel = 'Chưa có ảnh phòng' }) {
+function SafeImage({ src, alt, className, fallbackLabel = 'Chưa có ảnh phòng', priority = false }) {
   const [failedSrc, setFailedSrc] = useState(null)
 
   if (!src || failedSrc === src) {
@@ -164,7 +186,17 @@ function SafeImage({ src, alt, className, fallbackLabel = 'Chưa có ảnh phòn
     )
   }
 
-  return <img src={src} alt={alt || ''} className={className} loading="lazy" onError={() => setFailedSrc(src)} />
+  return (
+    <img
+      src={src}
+      alt={alt || ''}
+      className={className}
+      loading={priority ? 'eager' : 'lazy'}
+      decoding={priority ? 'sync' : 'async'}
+      fetchPriority={priority ? 'high' : 'auto'}
+      onError={() => setFailedSrc(src)}
+    />
+  )
 }
 
 function StatusBadge({ status }) {
@@ -266,7 +298,11 @@ function PublicCatalogPage({ location, navigate }) {
   const [rangeOpen, setRangeOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [rangeError, setRangeError] = useState('')
-  const [categories, setCategories] = useState({ roomTypes: ROOM_TYPES, wards: [] })
+  const [categories, setCategories] = useState({
+    roomTypes: ROOM_TYPES,
+    amenities: DEFAULT_AMENITIES,
+    wards: [],
+  })
   const [reloadTick, setReloadTick] = useState(0)
   const [catalogState, setCatalogState] = useState({ key: null, data: null, error: '' })
   const requestKey = `${buildPublicQueryString(urlState.filters, urlState.page)}|${reloadTick}`
@@ -275,30 +311,39 @@ function PublicCatalogPage({ location, navigate }) {
   const error = catalogState.key === requestKey ? catalogState.error : ''
 
   useEffect(() => {
-    api('/public/categories')
-      .then((res) => setCategories({ roomTypes: res.roomTypes || ROOM_TYPES, wards: res.wards || [] }))
+    const controller = new AbortController()
+    api('/public/categories', { signal: controller.signal })
+      .then((res) =>
+        setCategories({
+          roomTypes: res.roomTypes || ROOM_TYPES,
+          amenities: res.amenities || DEFAULT_AMENITIES,
+          wards: res.wards || [],
+        }),
+      )
       .catch(() => { })
+    return () => controller.abort()
   }, [])
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     const qs = buildPublicQueryString(urlState.filters, urlState.page)
     const key = `${qs}|${reloadTick}`
-    api(`/public/rooms${qs ? `?${qs}` : ''}`)
+    api(`/public/rooms${qs ? `?${qs}` : ''}`, { signal: controller.signal })
       .then((res) => {
         if (active) setCatalogState({ key, data: res, error: '' })
       })
       .catch((caught) => {
-        if (active) {
-          setCatalogState((prev) => ({
-            key,
-            data: prev.data,
-            error: caught.message || 'Không thể tải danh sách phòng lúc này.',
-          }))
-        }
+        if (!active || caught.name === 'AbortError') return
+        setCatalogState((prev) => ({
+          key,
+          data: prev.data,
+          error: caught.message || 'Không thể tải danh sách phòng lúc này.',
+        }))
       })
     return () => {
       active = false
+      controller.abort()
     }
   }, [urlState.filters, urlState.page, reloadTick])
 
@@ -336,6 +381,23 @@ function PublicCatalogPage({ location, navigate }) {
     commitFilters(next, 1)
   }
 
+  const setQuickArea = (minAreaM2, maxAreaM2) => {
+    const next = { ...draft, minAreaM2, maxAreaM2 }
+    setDraft(next)
+    commitFilters(next, 1)
+  }
+
+  const toggleAmenity = (amenity, commitNow = false) => {
+    const current = Array.isArray(draft.amenities) ? draft.amenities : []
+    const exists = current.includes(amenity)
+    const nextAmenities = exists ? current.filter((item) => item !== amenity) : [...current, amenity]
+    const next = { ...draft, amenities: nextAmenities }
+    setDraft(next)
+    if (commitNow) {
+      commitFilters(next, 1)
+    }
+  }
+
   const activeFilterCount = [
     urlState.filters.q,
     urlState.filters.ward,
@@ -345,10 +407,21 @@ function PublicCatalogPage({ location, navigate }) {
     urlState.filters.maxPriceVnd,
     urlState.filters.minAreaM2,
     urlState.filters.maxAreaM2,
-  ].filter(Boolean).length
+  ].filter(Boolean).length + (urlState.filters.amenities?.length || 0)
+
+  const advancedFilterCount =
+    [
+      urlState.filters.minPriceVnd,
+      urlState.filters.maxPriceVnd,
+      urlState.filters.minAreaM2,
+      urlState.filters.maxAreaM2,
+    ].filter(Boolean).length + (urlState.filters.amenities?.length || 0)
 
   const isPricePreset = (min, max) =>
     urlState.filters.minPriceVnd === min && urlState.filters.maxPriceVnd === max
+
+  const isAreaPreset = (min, max) =>
+    urlState.filters.minAreaM2 === min && urlState.filters.maxAreaM2 === max
 
   const activeChips = []
   if (urlState.filters.q) activeChips.push({ key: 'q', label: `Từ khóa: "${urlState.filters.q}"` })
@@ -370,6 +443,9 @@ function PublicCatalogPage({ location, navigate }) {
     const maxA = urlState.filters.maxAreaM2 ? `${urlState.filters.maxAreaM2} m²` : 'trở lên'
     activeChips.push({ key: 'area', label: `Diện tích: ${minA} – ${maxA}` })
   }
+  ;(urlState.filters.amenities || []).forEach((amenity) => {
+    activeChips.push({ key: `amenity:${amenity}`, label: `Tiện nghi: ${amenity}` })
+  })
 
   const removeChip = (key) => {
     const next = { ...urlState.filters }
@@ -379,6 +455,9 @@ function PublicCatalogPage({ location, navigate }) {
     } else if (key === 'area') {
       next.minAreaM2 = ''
       next.maxAreaM2 = ''
+    } else if (key.startsWith('amenity:')) {
+      const target = key.slice('amenity:'.length)
+      next.amenities = (next.amenities || []).filter((item) => item !== target)
     } else {
       next[key] = ''
     }
@@ -529,7 +608,7 @@ function PublicCatalogPage({ location, navigate }) {
                 onClick={() => setRangeOpen((v) => !v)}
                 aria-expanded={rangeOpen}
               >
-                <Icon name="filter" size={16} /> Giá &amp; Diện tích
+                <Icon name="filter" size={16} /> Lọc nâng cao{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
               </button>
 
               <button type="submit" className="button button-primary">
@@ -538,36 +617,56 @@ function PublicCatalogPage({ location, navigate }) {
             </div>
 
             <div className="filter-secondary-row">
-              <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng giá">
-                <span className="quick-chip-label">Mức giá nhanh:</span>
-                <button
-                  type="button"
-                  className={`filter-chip${isPricePreset('', '') ? ' is-active' : ''}`}
-                  onClick={() => setQuickPrice('', '')}
-                >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`filter-chip${isPricePreset('', '3500000') ? ' is-active' : ''}`}
-                  onClick={() => setQuickPrice('', '3500000')}
-                >
-                  Dưới 3,5 triệu
-                </button>
-                <button
-                  type="button"
-                  className={`filter-chip${isPricePreset('3500000', '5000000') ? ' is-active' : ''}`}
-                  onClick={() => setQuickPrice('3500000', '5000000')}
-                >
-                  3,5 – 5 triệu
-                </button>
-                <button
-                  type="button"
-                  className={`filter-chip${isPricePreset('5000000', '') ? ' is-active' : ''}`}
-                  onClick={() => setQuickPrice('5000000', '')}
-                >
-                  Trên 5 triệu
-                </button>
+              <div className="quick-chips-stack">
+                <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng giá">
+                  <span className="quick-chip-label">Mức giá nhanh:</span>
+                  <button
+                    type="button"
+                    className={`filter-chip${isPricePreset('', '') ? ' is-active' : ''}`}
+                    onClick={() => setQuickPrice('', '')}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip${isPricePreset('', '3500000') ? ' is-active' : ''}`}
+                    onClick={() => setQuickPrice('', '3500000')}
+                  >
+                    Dưới 3,5 triệu
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip${isPricePreset('3500000', '5000000') ? ' is-active' : ''}`}
+                    onClick={() => setQuickPrice('3500000', '5000000')}
+                  >
+                    3,5 – 5 triệu
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-chip${isPricePreset('5000000', '') ? ' is-active' : ''}`}
+                    onClick={() => setQuickPrice('5000000', '')}
+                  >
+                    Trên 5 triệu
+                  </button>
+                </div>
+
+                <div className="quick-price-chips" role="group" aria-label="Chọn nhanh tiện nghi nổi bật">
+                  <span className="quick-chip-label">Tiện nghi nổi bật:</span>
+                  {QUICK_AMENITIES.filter((item) => categories.amenities.includes(item)).map((amenity) => {
+                    const active = (urlState.filters.amenities || []).includes(amenity)
+                    return (
+                      <button
+                        type="button"
+                        key={amenity}
+                        className={`filter-chip${active ? ' is-active' : ''}`}
+                        aria-pressed={active}
+                        onClick={() => toggleAmenity(amenity, true)}
+                      >
+                        {amenity}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {activeFilterCount > 0 && (
@@ -578,66 +677,126 @@ function PublicCatalogPage({ location, navigate }) {
             </div>
 
             {rangeOpen && (
-              <div className="range-panel">
-                <div className="range-field">
-                  <label htmlFor="desktop-min-price">Giá từ (VND / tháng)</label>
-                  <input
-                    id="desktop-min-price"
-                    type="number"
-                    min="0"
-                    step="100000"
-                    placeholder="VD: 2500000"
-                    value={draft.minPriceVnd}
-                    onChange={(e) => {
-                      setRangeError('')
-                      setDraft({ ...draft, minPriceVnd: e.target.value })
-                    }}
-                  />
+              <div className="advanced-filter-panel">
+                <div className="range-panel">
+                  <div className="range-field">
+                    <label htmlFor="desktop-min-price">Giá từ (VND / tháng)</label>
+                    <input
+                      id="desktop-min-price"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="100000"
+                      placeholder="VD: 2500000"
+                      value={draft.minPriceVnd}
+                      onChange={(e) => {
+                        setRangeError('')
+                        setDraft({ ...draft, minPriceVnd: e.target.value })
+                      }}
+                    />
+                  </div>
+                  <div className="range-field">
+                    <label htmlFor="desktop-max-price">Giá đến (VND / tháng)</label>
+                    <input
+                      id="desktop-max-price"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="100000"
+                      placeholder="VD: 5500000"
+                      value={draft.maxPriceVnd}
+                      onChange={(e) => {
+                        setRangeError('')
+                        setDraft({ ...draft, maxPriceVnd: e.target.value })
+                      }}
+                    />
+                  </div>
+                  <div className="range-field">
+                    <label htmlFor="desktop-min-area">Diện tích từ (m²)</label>
+                    <input
+                      id="desktop-min-area"
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      step="1"
+                      placeholder="VD: 18"
+                      value={draft.minAreaM2}
+                      onChange={(e) => {
+                        setRangeError('')
+                        setDraft({ ...draft, minAreaM2: e.target.value })
+                      }}
+                    />
+                  </div>
+                  <div className="range-field">
+                    <label htmlFor="desktop-max-area">Diện tích đến (m²)</label>
+                    <input
+                      id="desktop-max-area"
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      step="1"
+                      placeholder="VD: 35"
+                      value={draft.maxAreaM2}
+                      onChange={(e) => {
+                        setRangeError('')
+                        setDraft({ ...draft, maxAreaM2: e.target.value })
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="range-field">
-                  <label htmlFor="desktop-max-price">Giá đến (VND / tháng)</label>
-                  <input
-                    id="desktop-max-price"
-                    type="number"
-                    min="0"
-                    step="100000"
-                    placeholder="VD: 5500000"
-                    value={draft.maxPriceVnd}
-                    onChange={(e) => {
-                      setRangeError('')
-                      setDraft({ ...draft, maxPriceVnd: e.target.value })
-                    }}
-                  />
+
+                <div className="advanced-subblock">
+                  <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng diện tích">
+                    <span className="quick-chip-label">Diện tích nhanh:</span>
+                    <button
+                      type="button"
+                      className={`filter-chip${isAreaPreset('', '') ? ' is-active' : ''}`}
+                      onClick={() => setQuickArea('', '')}
+                    >
+                      Tất cả
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-chip${isAreaPreset('', '20') ? ' is-active' : ''}`}
+                      onClick={() => setQuickArea('', '20')}
+                    >
+                      Dưới 20 m²
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-chip${isAreaPreset('20', '30') ? ' is-active' : ''}`}
+                      onClick={() => setQuickArea('20', '30')}
+                    >
+                      20 – 30 m²
+                    </button>
+                    <button
+                      type="button"
+                      className={`filter-chip${isAreaPreset('30', '') ? ' is-active' : ''}`}
+                      onClick={() => setQuickArea('30', '')}
+                    >
+                      Trên 30 m²
+                    </button>
+                  </div>
                 </div>
-                <div className="range-field">
-                  <label htmlFor="desktop-min-area">Diện tích từ (m²)</label>
-                  <input
-                    id="desktop-min-area"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="VD: 18"
-                    value={draft.minAreaM2}
-                    onChange={(e) => {
-                      setRangeError('')
-                      setDraft({ ...draft, minAreaM2: e.target.value })
-                    }}
-                  />
-                </div>
-                <div className="range-field">
-                  <label htmlFor="desktop-max-area">Diện tích đến (m²)</label>
-                  <input
-                    id="desktop-max-area"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="VD: 35"
-                    value={draft.maxAreaM2}
-                    onChange={(e) => {
-                      setRangeError('')
-                      setDraft({ ...draft, maxAreaM2: e.target.value })
-                    }}
-                  />
+
+                <div className="advanced-subblock">
+                  <span className="quick-chip-label">Tất cả tiện nghi phòng (chọn nhiều):</span>
+                  <div className="amenity-filter-grid" role="group" aria-label="Lọc theo tiện nghi phòng">
+                    {categories.amenities.map((amenity) => {
+                      const active = (draft.amenities || []).includes(amenity)
+                      return (
+                        <button
+                          type="button"
+                          key={amenity}
+                          className={`filter-chip${active ? ' is-active' : ''}`}
+                          aria-pressed={active}
+                          onClick={() => toggleAmenity(amenity, true)}
+                        >
+                          {amenity}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -757,8 +916,8 @@ function PublicCatalogPage({ location, navigate }) {
           ) : data?.items?.length ? (
             <>
               <div className="public-room-grid">
-                {data.items.map((room) => (
-                  <PublicRoomCard key={room.id} room={room} navigate={navigate} />
+                {data.items.map((room, index) => (
+                  <PublicRoomCard key={room.id} room={room} navigate={navigate} priority={index < 3} />
                 ))}
               </div>
               {data.totalPages > 1 && (
@@ -819,7 +978,7 @@ function PublicCatalogPage({ location, navigate }) {
   )
 }
 
-function PublicRoomCard({ room, navigate }) {
+function PublicRoomCard({ room, navigate, priority = false }) {
   const detailPath = `/rooms/${room.id}`
   const locationText = [room.publicAddress, room.ward, room.district].filter(Boolean).join(', ') || 'Quận Bình Thạnh'
   const visibleAmenities = (room.amenities || []).slice(0, 3)
@@ -828,7 +987,7 @@ function PublicRoomCard({ room, navigate }) {
   return (
     <article className={`public-room-card${room.availability === 'RENTED' ? ' is-rented' : ''}`}>
       <AppLink to={detailPath} navigate={navigate} className="card-media-link" aria-label={`Xem chi tiết ${room.title}`}>
-        <SafeImage src={room.coverImageUrl} alt={room.title} fallbackLabel="Ảnh phòng đang cập nhật" />
+        <SafeImage src={room.coverImageUrl} alt={room.title} priority={priority} fallbackLabel="Ảnh phòng đang cập nhật" />
         <div className="card-media-badges">
           <StatusBadge status={room.availability} />
           {room.roomType && <span className="card-type-pill">{room.roomType}</span>}
@@ -933,6 +1092,7 @@ function MobileFilterDrawer({ draft, setDraft, categories, rangeError, setRangeE
             <span>Giá tối thiểu (VND / tháng)</span>
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               step="100000"
               placeholder="VD: 2500000"
@@ -948,6 +1108,7 @@ function MobileFilterDrawer({ draft, setDraft, categories, rangeError, setRangeE
             <span>Giá tối đa (VND / tháng)</span>
             <input
               type="number"
+              inputMode="numeric"
               min="0"
               step="100000"
               placeholder="VD: 5500000"
@@ -963,6 +1124,7 @@ function MobileFilterDrawer({ draft, setDraft, categories, rangeError, setRangeE
             <span>Diện tích tối thiểu (m²)</span>
             <input
               type="number"
+              inputMode="decimal"
               min="1"
               step="1"
               placeholder="VD: 18"
@@ -978,6 +1140,7 @@ function MobileFilterDrawer({ draft, setDraft, categories, rangeError, setRangeE
             <span>Diện tích tối đa (m²)</span>
             <input
               type="number"
+              inputMode="decimal"
               min="1"
               step="1"
               placeholder="VD: 35"
@@ -988,6 +1151,32 @@ function MobileFilterDrawer({ draft, setDraft, categories, rangeError, setRangeE
               }}
             />
           </label>
+
+          <div className="field">
+            <span>Tiện nghi mong muốn</span>
+            <div className="amenity-filter-grid" role="group" aria-label="Chọn tiện nghi phòng">
+              {(categories.amenities || DEFAULT_AMENITIES).map((amenity) => {
+                const active = (draft.amenities || []).includes(amenity)
+                return (
+                  <button
+                    type="button"
+                    key={amenity}
+                    className={`filter-chip${active ? ' is-active' : ''}`}
+                    aria-pressed={active}
+                    onClick={() => {
+                      const current = Array.isArray(draft.amenities) ? draft.amenities : []
+                      const nextAmenities = active
+                        ? current.filter((item) => item !== amenity)
+                        : [...current, amenity]
+                      setDraft({ ...draft, amenities: nextAmenities })
+                    }}
+                  >
+                    {amenity}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
           {rangeError && (
             <div className="form-alert" role="alert">
@@ -1077,7 +1266,7 @@ function RoomGallery({ images, title }) {
   return (
     <div className="gallery-card">
       <div className="gallery-stage">
-        <SafeImage src={current.url} alt={current.altText || title} />
+        <SafeImage src={current.url} alt={current.altText || title} priority />
         {list.length > 1 && (
           <>
             <button
@@ -1131,13 +1320,14 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
 
   useEffect(() => {
     let active = true
+    const controller = new AbortController()
     const key = `${roomId}|${reloadTick}`
-    api(`/public/rooms/${roomId}`)
+    api(`/public/rooms/${roomId}`, { signal: controller.signal })
       .then((data) => {
         if (active) setDetailState({ key, item: data.item, notFound: false, error: '' })
       })
       .catch((caught) => {
-        if (!active) return
+        if (!active || caught.name === 'AbortError') return
         if (caught.status === 404) {
           setDetailState({ key, item: null, notFound: true, error: '' })
         } else {
@@ -1151,6 +1341,7 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
       })
     return () => {
       active = false
+      controller.abort()
     }
   }, [roomId, reloadTick])
 

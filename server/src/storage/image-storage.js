@@ -1,7 +1,11 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { env } = require("../config/env");
 
-const localRoot = path.resolve(__dirname, "../../uploads");
+const serverRoot = path.resolve(__dirname, "../..");
+const localRoot = env.UPLOAD_DIR
+  ? path.resolve(serverRoot, env.UPLOAD_DIR)
+  : path.resolve(serverRoot, "uploads");
 
 function resolveImagePath(listingId, storageKey) {
   const safeListingId = String(listingId);

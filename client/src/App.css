@@ -492,7 +492,7 @@ textarea:focus-visible {
 
 .filter-primary-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(150px, 0.7fr)) auto auto;
+  grid-template-columns: minmax(200px, 1.25fr) minmax(188px, 0.94fr) minmax(145px, 0.72fr) minmax(132px, 0.6fr) auto auto;
   gap: 10px;
   align-items: center;
 }
@@ -566,6 +566,11 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+.quick-chips-stack {
+  display: grid;
+  gap: 10px;
+}
+
 .quick-chip-label {
   color: var(--ink-500);
   font-size: 13px;
@@ -600,13 +605,29 @@ textarea:focus-visible {
   border-color: var(--brand-600);
 }
 
-.range-panel {
+.advanced-filter-panel {
   margin-top: 14px;
   padding-top: 16px;
   border-top: 1px dashed var(--border-subtle);
   display: grid;
+  gap: 14px;
+}
+
+.range-panel {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.advanced-subblock {
+  display: grid;
+  gap: 8px;
+}
+
+.amenity-filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .range-field {
@@ -1614,6 +1635,9 @@ textarea:focus-visible {
   }
   .range-panel {
     grid-template-columns: 1fr;
+  }
+  .filter-drawer .filter-chip {
+    min-height: 44px;
   }
   .detail-amenities-grid {
     grid-template-columns: 1fr;

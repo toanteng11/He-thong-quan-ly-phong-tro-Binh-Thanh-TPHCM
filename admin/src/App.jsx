@@ -1,14 +1,37 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from './components/Icon.jsx'
 import { api } from './lib/api.js'
 import { branding } from './branding.js'
 import './App.css'
 
 const ROOM_TYPES = ['Phòng trọ', 'Phòng có gác', 'Phòng studio', 'Căn hộ mini', 'Phòng ở ghép']
+const BINH_THANH_WARDS = [
+  'Phường Gia Định',
+  'Phường Bình Thạnh',
+  'Phường Bình Lợi Trung',
+  'Phường Thạnh Mỹ Tây',
+  'Phường Bình Quới',
+]
 const AMENITIES = [
-  'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Giường', 'Tủ quần áo', 'Bếp riêng',
+  'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
   'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',
 ]
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const ALLOWED_IMAGE_EXTS = /\.(jpe?g|png|webp)$/i
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+function validateDraftImageFile(file) {
+  if (!file) return 'Tệp không hợp lệ.'
+  const hasAllowedMime = file.type ? ALLOWED_IMAGE_TYPES.has(file.type) : false
+  const hasAllowedExt = ALLOWED_IMAGE_EXTS.test(file.name || '')
+  if (!hasAllowedMime && !hasAllowedExt) {
+    return 'Chỉ hỗ trợ ảnh định dạng JPEG, PNG hoặc WebP.'
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return 'Kích thước ảnh vượt quá giới hạn 10 MB.'
+  }
+  return ''
+}
 
 const emptyListing = {
   title: '', description: '', roomType: '', priceVnd: null, areaM2: null, amenities: [],
@@ -1256,8 +1279,17 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState('')
   const [imageToRemove, setImageToRemove] = useState(null)
+  const pendingUrlsRef = useRef(new Set())
 
-  const isDirty = savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot
+  const isDirty = (savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot) || (!roomId && images.length > 0)
+
+  useEffect(() => {
+    const urls = pendingUrlsRef.current
+    return () => {
+      for (const url of urls) URL.revokeObjectURL(url)
+      urls.clear()
+    }
+  }, [])
 
   useEffect(() => {
     if (!roomId) return
@@ -1265,7 +1297,11 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
     api(`/admin/rooms/${roomId}`)
       .then(({ item }) => {
         if (!active) return
-        const nextForm = { ...emptyListing, ...item }
+        const nextForm = {
+          ...emptyListing,
+          ...item,
+          amenities: (item.amenities || []).filter((amenity) => AMENITIES.includes(amenity)),
+        }
         setForm(nextForm)
         setImages(item.images || [])
         setAvailability(item.availability)
@@ -1334,9 +1370,34 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
         : await api('/admin/rooms', { method: 'POST', json: { ...payload, availability } })
       const item = response.item
       if (!roomId) {
+        const pendingFiles = images.filter((image) => image.file)
+        let uploadedCount = 0
+        const uploadFailures = []
+        for (let i = 0; i < pendingFiles.length; i += 1) {
+          const pending = pendingFiles[i]
+          setUploading(`Đang tải ảnh ${i + 1} / ${pendingFiles.length}…`)
+          const body = new FormData()
+          body.append('file', pending.file)
+          try {
+            await api(`/admin/rooms/${item.id}/images`, { method: 'POST', body })
+            uploadedCount += 1
+          } catch (caught) {
+            uploadFailures.push(`${pending.originalName}: ${caught.message}`)
+          }
+        }
+        setUploading('')
         setSavedSnapshot(JSON.stringify(form))
         navigate(`/rooms/${item.id}`, { force: true })
-        showNotice('Bản nháp đã được tạo. Bạn có thể tiếp tục bổ sung thông tin và ảnh.')
+        if (!pendingFiles.length) {
+          showNotice('Bản nháp đã được lưu. Bạn có thể kiểm tra và bấm Xuất bản khi sẵn sàng.')
+        } else if (!uploadFailures.length) {
+          showNotice(`Bản nháp đã được lưu kèm ${uploadedCount} ảnh (đã chọn ảnh bìa). Bạn có thể xem lại trước khi xuất bản.`)
+        } else {
+          showNotice(
+            `Đã lưu bản nháp và tải lên ${uploadedCount}/${pendingFiles.length} ảnh. Hãy tải lại các ảnh bị lỗi trong màn chỉnh sửa.`,
+            'info',
+          )
+        }
         return item
       }
       setSavedSnapshot(JSON.stringify(form))
@@ -1346,6 +1407,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
       if (!quiet) showNotice('Thông tin tin phòng đã được lưu.')
       return item
     } catch (caught) {
+      setUploading('')
       setError(caught.message)
       if (caught.fieldErrors) {
         setFieldErrors(
@@ -1361,9 +1423,54 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   }
 
   const uploadFilesList = async (files) => {
-    if (!roomId || !files.length || uploading || images.length >= 15) return
+    if (!files.length || uploading || images.length >= 15) return
     setError('')
     setUploadErrors([])
+
+    if (!roomId) {
+      const remainingSlots = Math.max(0, 15 - images.length)
+      const perFileErrors = []
+      const queued = []
+
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i]
+        if (queued.length >= remainingSlots) {
+          perFileErrors.push({ name: file.name, message: 'Vượt quá giới hạn tối đa 15 ảnh mỗi tin.' })
+          continue
+        }
+        const invalidMessage = validateDraftImageFile(file)
+        if (invalidMessage) {
+          perFileErrors.push({ name: file.name, message: invalidMessage })
+          continue
+        }
+        const url = URL.createObjectURL(file)
+        pendingUrlsRef.current.add(url)
+        queued.push({
+          id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
+          file,
+          url,
+          originalName: file.name,
+          altText: file.name,
+          isCover: false,
+          isLocal: true,
+        })
+      }
+
+      if (queued.length > 0) {
+        setImages((current) => {
+          const combined = [...current, ...queued]
+          return combined.map((img, index) => ({ ...img, isCover: index === 0 }))
+        })
+        showNotice(
+          perFileErrors.length
+            ? `Đã thêm ${queued.length} ảnh vào bản nháp; ${perFileErrors.length} ảnh không hợp lệ.`
+            : `Đã thêm ${queued.length} ảnh. Chọn "Đặt làm bìa" để đổi ảnh nền nếu muốn.`,
+        )
+      }
+      setUploadErrors(perFileErrors)
+      return
+    }
+
     let completed = 0
     const perFileErrors = []
 
@@ -1403,6 +1510,11 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   }
 
   const applyImageOrder = async (nextImages, noticeText = '') => {
+    if (!roomId) {
+      setImages(nextImages.map((img, idx) => ({ ...img, isCover: idx === 0 })))
+      if (noticeText) showNotice(noticeText)
+      return
+    }
     try {
       const result = await api(`/admin/rooms/${roomId}/images/order`, {
         method: 'PATCH',
@@ -1430,6 +1542,21 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
     const [chosen] = next.splice(index, 1)
     next.unshift(chosen)
     await applyImageOrder(next, 'Đã chọn ảnh làm ảnh bìa.')
+  }
+
+  const handleRemoveImageClick = (image) => {
+    if (!roomId) {
+      if (image.url && pendingUrlsRef.current.has(image.url)) {
+        URL.revokeObjectURL(image.url)
+        pendingUrlsRef.current.delete(image.url)
+      }
+      setImages((current) =>
+        current.filter((item) => item.id !== image.id).map((item, idx) => ({ ...item, isCover: idx === 0 })),
+      )
+      showNotice('Đã gỡ ảnh khỏi danh sách chờ.')
+      return
+    }
+    setImageToRemove(image)
   }
 
   const removeImage = async () => {
@@ -1480,6 +1607,9 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
             ? 'Tin đã được ẩn khỏi trang khách.'
             : 'Tin đã được chuyển về bản nháp.',
       )
+      if (status === 'PUBLISHED') {
+        navigate('/', { force: true })
+      }
     } catch (caught) {
       setError(caught.message)
       if (caught.fieldErrors) {
@@ -1556,7 +1686,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
         description={
           roomId
             ? `Cập nhật lần cuối ${form.updatedAt ? new Date(form.updatedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}`
-            : 'Nhập thông tin cơ bản trước. Bạn có thể lưu nháp và hoàn thiện sau.'
+            : 'Nhập thông tin, chọn tiện nghi và tải ảnh phòng (chọn ảnh bìa) ngay tại đây. Hoàn tất sẽ lưu thành bản nháp để bạn quyết định xuất bản sau.'
         }
         back={() => navigate('/rooms')}
         action={
@@ -1719,11 +1849,15 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
 
               <label className="field" id="field-ward">
                 <span>Phường <b>*</b></span>
-                <input
-                  value={form.ward}
-                  onChange={(e) => update('ward', e.target.value)}
-                  placeholder="Ví dụ: Phường 15"
-                />
+                <select value={form.ward} onChange={(e) => update('ward', e.target.value)}>
+                  <option value="">Chọn phường (Bình Thạnh 2026)</option>
+                  {form.ward && !BINH_THANH_WARDS.includes(form.ward) && (
+                    <option value={form.ward}>{form.ward} (tên cũ)</option>
+                  )}
+                  {BINH_THANH_WARDS.map((wardName) => (
+                    <option key={wardName} value={wardName}>{wardName}</option>
+                  ))}
+                </select>
                 {fieldError('ward')}
               </label>
 
@@ -1785,115 +1919,104 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">05</span>
               <div>
                 <h2>Hình ảnh phòng</h2>
-                <p>Ảnh rõ, chân thực giúp khách dễ quyết định hơn. Chọn ảnh đầu tiên làm ảnh bìa.</p>
+                <p>Ảnh rõ, chân thực giúp khách dễ quyết định hơn. Chọn ảnh làm ảnh bìa ngay trước khi lưu.</p>
               </div>
               <span className="section-counter">{images.length} / 15</span>
             </div>
 
-            {!roomId ? (
-              <div className="upload-prerequisite">
-                <span className="upload-icon"><Icon name="image" size={21} /></span>
-                <span>
-                  <strong>Lưu tin nháp trước khi tải ảnh</strong>
-                  <small>Sau khi tạo tin nháp, bạn có thể tải, chọn ảnh bìa và sắp xếp tối đa 15 ảnh.</small>
-                </span>
+            <label
+              className={`upload-dropzone${uploading ? ' is-uploading' : ''}${isDragOver ? ' is-dragover' : ''}`}
+              onDragOver={(event) => {
+                event.preventDefault()
+                if (!uploading && images.length < 15) setIsDragOver(true)
+              }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={(event) => {
+                event.preventDefault()
+                setIsDragOver(false)
+                const files = Array.from(event.dataTransfer?.files || [])
+                uploadFilesList(files)
+              }}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={uploadFiles}
+                disabled={Boolean(uploading) || images.length >= 15}
+              />
+              <span className="upload-icon"><Icon name="upload" size={21} /></span>
+              <strong>{uploading || (images.length >= 15 ? 'Đã đạt giới hạn 15 ảnh' : 'Chọn hoặc kéo thả ảnh từ thiết bị')}</strong>
+              <small>Hỗ trợ JPEG, PNG hoặc WebP · tối đa 10 MB mỗi ảnh ({images.length}/15)</small>
+              <span className="button button-secondary button-small">Chọn hình ảnh</span>
+            </label>
+
+            {uploadErrors.length > 0 && (
+              <div className="upload-file-errors" role="alert">
+                <strong>Một số tệp chưa thể tải lên:</strong>
+                <ul>
+                  {uploadErrors.map((item, idx) => (
+                    <li key={`${item.name}-${idx}`}>
+                      <span>{item.name}</span>: {item.message}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ) : (
-              <>
-                <label
-                  className={`upload-dropzone${uploading ? ' is-uploading' : ''}${isDragOver ? ' is-dragover' : ''}`}
-                  onDragOver={(event) => {
-                    event.preventDefault()
-                    if (!uploading && images.length < 15) setIsDragOver(true)
-                  }}
-                  onDragLeave={() => setIsDragOver(false)}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    setIsDragOver(false)
-                    const files = Array.from(event.dataTransfer?.files || [])
-                    uploadFilesList(files)
-                  }}
-                >
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    onChange={uploadFiles}
-                    disabled={Boolean(uploading) || images.length >= 15}
-                  />
-                  <span className="upload-icon"><Icon name="upload" size={21} /></span>
-                  <strong>{uploading || (images.length >= 15 ? 'Đã đạt giới hạn 15 ảnh' : 'Chọn hoặc kéo thả ảnh từ thiết bị')}</strong>
-                  <small>Hỗ trợ JPEG, PNG hoặc WebP · tối đa 10 MB mỗi ảnh ({images.length}/15)</small>
-                  <span className="button button-secondary button-small">Chọn hình ảnh</span>
-                </label>
-
-                {uploadErrors.length > 0 && (
-                  <div className="upload-file-errors" role="alert">
-                    <strong>Một số tệp chưa thể tải lên:</strong>
-                    <ul>
-                      {uploadErrors.map((item, idx) => (
-                        <li key={`${item.name}-${idx}`}>
-                          <span>{item.name}</span>: {item.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {images.length > 0 && (
-                  <div className="image-grid">
-                    {images.map((image, index) => (
-                      <article className={`image-tile${image.isCover ? ' is-cover' : ''}`} key={image.id}>
-                        <SafeImage src={image.url} alt={image.altText || image.originalName} fallbackLabel="Lỗi tải ảnh" />
-                        {image.isCover ? (
-                          <span className="cover-label">
-                            <Icon name="star" size={13} filled /> Ảnh bìa
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="set-cover-btn"
-                            onClick={() => makeCover(index)}
-                            title="Chọn làm ảnh bìa hiển thị ngoài danh sách"
-                          >
-                            <Icon name="star" size={13} /> Đặt làm bìa
-                          </button>
-                        )}
-                        <div className="image-controls">
-                          <span>#{index + 1}</span>
-                          <div>
-                            <button
-                              type="button"
-                              aria-label="Đưa ảnh lên trước"
-                              disabled={index === 0}
-                              onClick={() => reorder(index, -1)}
-                            >
-                              ←
-                            </button>
-                            <button
-                              type="button"
-                              aria-label="Đưa ảnh xuống sau"
-                              disabled={index === images.length - 1}
-                              onClick={() => reorder(index, 1)}
-                            >
-                              →
-                            </button>
-                            <button
-                              type="button"
-                              aria-label="Gỡ ảnh"
-                              onClick={() => setImageToRemove(image)}
-                            >
-                              <Icon name="trash" size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {fieldError('images')}
-              </>
             )}
+
+            {images.length > 0 && (
+              <div className="image-grid">
+                {images.map((image, index) => (
+                  <article className={`image-tile${image.isCover ? ' is-cover' : ''}`} key={image.id}>
+                    <SafeImage src={image.url} alt={image.altText || image.originalName} fallbackLabel="Lỗi tải ảnh" />
+                    {image.isCover ? (
+                      <span className="cover-label">
+                        <Icon name="star" size={13} filled /> Ảnh bìa
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="set-cover-btn"
+                        onClick={() => makeCover(index)}
+                        title="Chọn làm ảnh bìa hiển thị ngoài danh sách"
+                      >
+                        <Icon name="star" size={13} /> Đặt làm bìa
+                      </button>
+                    )}
+                    <div className="image-controls">
+                      <span>#{index + 1}</span>
+                      <div>
+                        <button
+                          type="button"
+                          aria-label="Đưa ảnh lên trước"
+                          disabled={index === 0 || Boolean(uploading)}
+                          onClick={() => reorder(index, -1)}
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Đưa ảnh xuống sau"
+                          disabled={index === images.length - 1 || Boolean(uploading)}
+                          onClick={() => reorder(index, 1)}
+                        >
+                          →
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Gỡ ảnh"
+                          disabled={Boolean(uploading)}
+                          onClick={() => handleRemoveImageClick(image)}
+                        >
+                          <Icon name="trash" size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+            {fieldError('images')}
           </section>
 
           <section className="panel form-section">
@@ -1962,9 +2085,9 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <button type="button" className="button button-quiet" onClick={() => navigate('/rooms')}>
                 Quay lại
               </button>
-              <button type="submit" className="button button-secondary" disabled={busy}>
-                {busy ? <span className="spinner dark-spinner" /> : <Icon name="check" size={16} />}
-                {publishStatus === 'PUBLISHED' ? 'Lưu thay đổi' : 'Lưu nháp'}
+              <button type="submit" className="button button-secondary" disabled={busy || Boolean(uploading)}>
+                {busy || uploading ? <span className="spinner dark-spinner" /> : <Icon name="check" size={16} />}
+                {!roomId ? 'Hoàn thành & Lưu bản nháp' : publishStatus === 'PUBLISHED' ? 'Lưu thay đổi' : 'Lưu nháp'}
               </button>
               {roomId && (
                 <button

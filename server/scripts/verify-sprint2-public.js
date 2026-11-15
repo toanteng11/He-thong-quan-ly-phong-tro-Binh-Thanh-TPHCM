@@ -52,6 +52,13 @@ async function main() {
   const seeded = await roomListings.find({ seedTag: SEED_TAG }).toArray();
   assert.ok(seeded.length >= 19, `Expected at least 19 seeded Sprint 2 rooms, got ${seeded.length}. Run db:seed:sprint2 first.`);
 
+  const allPublished = await roomListings.find({ publishStatus: "PUBLISHED", deletedAt: null }).toArray();
+  const totalPublished = allPublished.length;
+  const totalAvailable = allPublished.filter((d) => d.availability === "AVAILABLE").length;
+  const totalRented = totalPublished - totalAvailable;
+  const expectedTotalPages = Math.ceil(totalPublished / 12);
+  assert.ok(totalPublished >= 14 && totalAvailable >= 11 && totalRented >= 3);
+
   const draftDoc = seeded.find((d) => d.publishStatus === "DRAFT");
   const hiddenDoc = seeded.find((d) => d.publishStatus === "HIDDEN" && !d.deletedAt);
   const deletedDoc = seeded.find((d) => d.deletedAt !== null);
@@ -67,14 +74,16 @@ async function main() {
   assert.equal(listPage1.response.status, 200);
   assert.equal(listPage1.json.page, 1);
   assert.equal(listPage1.json.pageSize, 12);
-  assert.equal(listPage1.json.totalItems, 14);
-  assert.equal(listPage1.json.totalPages, 2);
-  assert.equal(listPage1.json.hasNext, true);
-  assert.equal(listPage1.json.items.length, 12);
-  const first11 = listPage1.json.items.slice(0, 11);
-  assert.ok(first11.every((item) => item.availability === "AVAILABLE"), "First 11 items must be AVAILABLE");
-  assert.equal(listPage1.json.items[11].availability, "RENTED", "12th item must be RENTED");
-  results.push("AT-01 PASS (14 PUBLISHED, 11 AVAILABLE ranked before 3 RENTED, 12/page)");
+  assert.equal(listPage1.json.totalItems, totalPublished);
+  assert.equal(listPage1.json.totalPages, expectedTotalPages);
+  assert.equal(listPage1.json.hasNext, expectedTotalPages > 1);
+  assert.equal(listPage1.json.items.length, Math.min(12, totalPublished));
+  const availOnPage1 = Math.min(12, totalAvailable);
+  assert.ok(listPage1.json.items.slice(0, availOnPage1).every((item) => item.availability === "AVAILABLE"), "AVAILABLE rooms must rank first");
+  if (availOnPage1 < listPage1.json.items.length) {
+    assert.ok(listPage1.json.items.slice(availOnPage1).every((item) => item.availability === "RENTED"), "RENTED rooms follow AVAILABLE rooms");
+  }
+  results.push(`AT-01 PASS (${totalPublished} PUBLISHED, ${totalAvailable} AVAILABLE ranked before ${totalRented} RENTED, 12/page)`);
 
   // AT-02: Public room detail, images order, contact flags
   const detailBoth = await fetchJson(`/public/rooms/${phoneAndZaloDoc._id}`);
@@ -105,32 +114,42 @@ async function main() {
   // AT-04: Categories & multi-filter combination
   const cats = await fetchJson("/public/categories");
   assert.equal(cats.response.status, 200);
-  assert.ok(cats.json.wards.includes("Phường 25"));
+  for (const expectedWard of [
+    "Phường Gia Định",
+    "Phường Bình Thạnh",
+    "Phường Bình Lợi Trung",
+    "Phường Thạnh Mỹ Tây",
+    "Phường Bình Quới",
+  ]) {
+    assert.ok(cats.json.wards.includes(expectedWard), `Missing expected 2026 ward: ${expectedWard}`);
+  }
+  assert.ok(!cats.json.amenities.includes("Máy giặt"), "Amenities must not include Máy giặt");
+  assert.ok(cats.json.amenities.includes("Thang máy"), "Amenities must include Thang máy");
   assert.ok(!cats.json.wards.some((w) => w.includes("DRAFT-ONLY") || w.includes("HIDDEN-ONLY") || w.includes("DELETED-ONLY")));
 
   const combined = await fetchJson(
-    `/public/rooms?ward=${encodeURIComponent("Phường 25")}&roomType=${encodeURIComponent("Phòng studio")}&minPriceVnd=4500000&maxPriceVnd=5500000&minAreaM2=25&maxAreaM2=35&availability=AVAILABLE`,
+    `/public/rooms?ward=${encodeURIComponent("Phường Thạnh Mỹ Tây")}&roomType=${encodeURIComponent("Phòng studio")}&minPriceVnd=4500000&maxPriceVnd=5500000&minAreaM2=25&maxAreaM2=35&availability=AVAILABLE`,
   );
   assert.equal(combined.response.status, 200);
   assert.equal(combined.json.totalItems, 2);
-  assert.ok(combined.json.items.every((i) => i.ward === "Phường 25" && i.roomType === "Phòng studio" && i.availability === "AVAILABLE" && i.priceVnd >= 4500000 && i.priceVnd <= 5500000 && i.areaM2 >= 25 && i.areaM2 <= 35));
-  results.push("AT-04 PASS (categories exclude non-public wards; combined filters accurate)");
+  assert.ok(combined.json.items.every((i) => i.ward === "Phường Thạnh Mỹ Tây" && i.roomType === "Phòng studio" && i.availability === "AVAILABLE" && i.priceVnd >= 4500000 && i.priceVnd <= 5500000 && i.areaM2 >= 25 && i.areaM2 <= 35));
+  results.push("AT-04 PASS (categories include 5 2026 wards & Thang máy, exclude non-public wards; combined filters accurate)");
 
   // AT-05: All 4 sort modes
-  const sortNewest = await fetchJson("/public/rooms?sort=publishedAt_desc&pageSize=14");
+  const sortNewest = await fetchJson(`/public/rooms?sort=publishedAt_desc&pageSize=${Math.min(48, totalPublished)}`);
   assert.equal(sortNewest.response.status, 200);
-  assert.equal(sortNewest.json.items[0].availability, "RENTED", "Newest publishedAt in seed is RENTED when sorting strictly by publishedAt_desc");
+  assert.equal(sortNewest.json.items.length, Math.min(48, totalPublished));
   for (let i = 1; i < sortNewest.json.items.length; i += 1) {
     assert.ok(new Date(sortNewest.json.items[i - 1].publishedAt) >= new Date(sortNewest.json.items[i].publishedAt));
   }
 
-  const sortAsc = await fetchJson("/public/rooms?sort=price_asc&pageSize=14");
+  const sortAsc = await fetchJson(`/public/rooms?sort=price_asc&pageSize=${Math.min(48, totalPublished)}`);
   assert.equal(sortAsc.response.status, 200);
   for (let i = 1; i < sortAsc.json.items.length; i += 1) {
     assert.ok(sortAsc.json.items[i - 1].priceVnd <= sortAsc.json.items[i].priceVnd);
   }
 
-  const sortDesc = await fetchJson("/public/rooms?sort=price_desc&pageSize=14");
+  const sortDesc = await fetchJson(`/public/rooms?sort=price_desc&pageSize=${Math.min(48, totalPublished)}`);
   assert.equal(sortDesc.response.status, 200);
   for (let i = 1; i < sortDesc.json.items.length; i += 1) {
     assert.ok(sortDesc.json.items[i - 1].priceVnd >= sortDesc.json.items[i].priceVnd);
@@ -158,19 +177,24 @@ async function main() {
   assert.deepEqual(emptyRes.json.items, []);
   results.push("AT-10 PASS (empty result response verified)");
 
-  // AT-11: Pagination across page 1 & page 2, max pageSize=48 check
+  // AT-11: Pagination across all pages, max pageSize=48 check
   const listPage2 = await fetchJson("/public/rooms?page=2");
   assert.equal(listPage2.response.status, 200);
   assert.equal(listPage2.json.page, 2);
-  assert.equal(listPage2.json.items.length, 2);
-  assert.equal(listPage2.json.hasNext, false);
+  assert.equal(listPage2.json.items.length, Math.min(12, Math.max(0, totalPublished - 12)));
+  assert.equal(listPage2.json.hasNext, expectedTotalPages > 2);
   const allPagedIds = [...listPage1.json.items, ...listPage2.json.items].map((x) => x.id);
-  assert.equal(new Set(allPagedIds).size, 14, "Page 1 and Page 2 must not overlap or skip items");
+  for (let p = 3; p <= expectedTotalPages; p += 1) {
+    const nextPage = await fetchJson(`/public/rooms?page=${p}`);
+    assert.equal(nextPage.response.status, 200);
+    allPagedIds.push(...nextPage.json.items.map((x) => x.id));
+  }
+  assert.equal(new Set(allPagedIds).size, totalPublished, "Pages must not overlap or skip items");
 
   const oversizedPage = await fetchJson("/public/rooms?pageSize=49");
   assert.equal(oversizedPage.response.status, 400);
   assert.equal(oversizedPage.json.error.code, "INVALID_QUERY");
-  results.push("AT-11 PASS (page 1+2 unique 14 items; pageSize=49 rejected 400 INVALID_QUERY)");
+  results.push(`AT-11 PASS (pages unique ${totalPublished} items; pageSize=49 rejected 400 INVALID_QUERY)`);
 
   // AT-18 & AT-23: Non-published/deleted 404 + immediate hide reflection
   for (const blocked of [draftDoc, hiddenDoc, deletedDoc]) {
