@@ -4,7 +4,7 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const express = require("express");
 const helmet = require("helmet");
 const { env } = require("./config/env");
-const { pool } = require("./db/pool");
+const { closeDb } = require("./db/mongo");
 const { requestId } = require("./middleware/request-id");
 const { healthRouter } = require("./routes/health");
 
@@ -19,8 +19,9 @@ app.use((request, response, next) => {
   if (origin && origin === env.CLIENT_ORIGIN) {
     response.setHeader("Access-Control-Allow-Origin", origin);
     response.setHeader("Vary", "Origin");
-    response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    response.setHeader("Access-Control-Allow-Credentials", "true");
   }
 
   if (request.method === "OPTIONS") {
@@ -30,6 +31,8 @@ app.use((request, response, next) => {
 });
 
 app.use("/api/v1/health", healthRouter);
+app.use("/api/v1/public", require("./routes/public").publicRouter);
+app.use("/api/v1/admin", require("./routes/admin").adminRouter);
 
 app.use((request, response) => {
   response.status(404).json({
@@ -47,10 +50,25 @@ app.use((error, request, response, _next) => {
     requestId: request.requestId,
     errorName: error.name,
   }));
-  response.status(500).json({
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 499 ? error.status : 500;
+  const code = status >= 400 && status <= 499 && error.code
+    ? error.code
+    : status === 413
+      ? "PAYLOAD_TOO_LARGE"
+      : status === 400
+        ? "INVALID_REQUEST"
+        : "INTERNAL_ERROR";
+  const message = status >= 400 && status <= 499 && error.code && error.message
+    ? error.message
+    : status === 413
+      ? "Tệp tải lên vượt quá giới hạn cho phép."
+      : status === 400
+        ? "Yêu cầu chưa đúng định dạng."
+        : "Đã xảy ra lỗi máy chủ.";
+  response.status(status).json({
     error: {
-      code: "INTERNAL_ERROR",
-      message: "Đã xảy ra lỗi máy chủ.",
+      code,
+      message,
       requestId: request.requestId,
     },
   });
@@ -63,7 +81,7 @@ const server = app.listen(env.PORT, env.HOST, () => {
 async function shutdown(signal) {
   console.log("Received " + signal + "; shutting down.");
   server.close(async () => {
-    await pool.end();
+    await closeDb();
     process.exit(0);
   });
 }

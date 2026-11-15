@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { pool } = require("../db/pool");
+const { pingDb } = require("../db/mongo");
 
 const router = Router();
 
@@ -12,7 +12,7 @@ router.get("/live", (_request, response) => {
 
 router.get("/ready", async (request, response) => {
   try {
-    await pool.query("SELECT 1");
+    await pingDb();
     response.status(200).json({
       status: "ready",
       service: "room-rental-api",

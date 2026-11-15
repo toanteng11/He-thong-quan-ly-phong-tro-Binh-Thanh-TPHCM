@@ -54,7 +54,9 @@ Thiếu các đầu vào này thì có thể hoàn thiện trên staging, nhưng
 - [11_Change_Management](<./Đợt 3 - Chuẩn bị phát triển/11_Change_Management.md>)
 
 ### Tài liệu triển khai Scrum
-- [Tài liệu triển khai Sprint 0](<../Tài liệu triển khai/Sprint_0_Setup.md>) — setup môi trường/công cụ là bước khởi đầu; không thay thế triển khai, bảo mật và nghiệm thu production.
+- [Tổng quan kế hoạch triển khai](<../Tài liệu triển khai/README.md>) — lộ trình tổng thể Sprint 0–4 và nguyên tắc áp dụng.
+- [Tài liệu triển khai Sprint 0](<../Tài liệu triển khai/Sprint_0_Setup.md>) — setup môi trường/công cụ local là bước khởi đầu; không thay thế triển khai, bảo mật và nghiệm thu production.
+- [Tài liệu triển khai Sprint 1](<../Tài liệu triển khai/Sprint_1_Admin_Quan_ly_Tin_Phong.md>) — xây dựng khu quản trị, xác thực phiên admin, CRUD tin phòng, quản lý ảnh và quy chuẩn Design Tokens.
 
 ## Quy ước và trạng thái quyết định
 

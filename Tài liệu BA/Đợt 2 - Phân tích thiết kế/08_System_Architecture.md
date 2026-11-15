@@ -34,7 +34,7 @@ Trang public và admin có thể nằm trong một ứng dụng web nhưng tách
 
 ## 5. Định hướng công nghệ
 
-Sprint 0 đề xuất React + Vite cho giao diện, Node.js 24 LTS + Express 5 cho API và PostgreSQL 18 cho database; đây là stack ứng viên thống nhất với tài liệu triển khai. Product Owner ghi ADR-S0-01 để phê duyệt trước khi tạo schema; nếu đổi database/runtime thì phải cập nhật các hợp đồng dữ liệu, backup, triển khai và chi phí. Production provider vẫn được chọn riêng theo khả năng private DB, backup/restore, vùng triển khai, chi phí và hỗ trợ.
+Kiến trúc hệ thống sử dụng React + Vite cho giao diện, Node.js 24 LTS + Express 5 cho API và **MongoDB 8** (driver chính thức `mongodb`) cho cơ sở dữ liệu theo quyết định đã cập nhật tại `ADR-S0-01`. Mô hình tài liệu của MongoDB cho phép lưu trữ trực tiếp danh sách tiện nghi và mảng ảnh tối đa 15 phần tử trong cùng một document `room_listings`, đảm bảo cập nhật nguyên tử đơn document và loại bỏ thao tác join phức tạp. Production provider (ví dụ MongoDB Atlas hoặc máy chủ MongoDB riêng có TLS/IP allowlist và snapshot backup) vẫn được chọn theo khả năng private DB, backup/restore, vùng triển khai, chi phí và hỗ trợ.
 
 Với MVP, ưu tiên một backend đơn khối có module và một cơ sở dữ liệu. Chỉ tách dịch vụ khi có tải hoặc nhu cầu độc lập đã được đo; không cần bắt đầu bằng microservices.
 
@@ -65,7 +65,7 @@ Môi trường đề xuất: local/dev để phát triển; staging để kiểm
 
 | Nội dung | Quyết định/việc cần làm |
 |---|---|
-| Cơ sở dữ liệu | Stack ứng viên PostgreSQL 18 theo Sprint 0; cần ghi ADR xác nhận engine/version và dịch vụ production. |
+| Cơ sở dữ liệu | MongoDB 8 (driver chính thức `mongodb`) đã được chọn thay thế PostgreSQL theo `ADR-S0-01`; cần chốt dịch vụ production (Atlas hoặc self-managed riêng tư). |
 | Lưu ảnh | Dùng object storage hoặc dịch vụ tương đương; giới hạn ảnh đã được chốt tại Data Analysis. |
 | Đăng nhập | Dùng session cookie an toàn; chi tiết timeout/CSRF/rate limit phải ghi trong ADR/API trước khi triển khai. |
 | Sao lưu | Baseline hàng ngày, 7 daily + 4 weekly, RPO ≤24h/RTO ≤1 ngày làm việc; chủ dự án duyệt provider/chi phí. |
@@ -146,7 +146,7 @@ Không sao chép dữ liệu thật sang staging nếu không cần. Thay đổi
 | Mã | Quyết định | Khuyến nghị hiện tại | Trạng thái |
 |---|---|---|---|
 | ADR-01 | Phong cách backend | Modular monolith cho MVP | Đề xuất |
-| ADR-02 | Cơ sở dữ liệu | PostgreSQL 18 là ứng viên theo Sprint 0; ghi xác nhận engine/version và provider production | Cần chốt |
+| ADR-02 | Cơ sở dữ liệu | MongoDB 8 + driver `mongodb` (thay cho PostgreSQL 18 theo cập nhật `ADR-S0-01`); còn cần chốt provider production | Đã chọn local; chờ chốt production |
 | ADR-03 | Ảnh | Object storage hoặc dịch vụ ảnh quản lý được; không lưu file ảnh lớn trực tiếp trong trường tin | Cần chốt |
 | ADR-04 | Đăng nhập | Phiên admin an toàn; không có tự đăng ký | Cần chốt cách triển khai |
 | ADR-05 | Public rendering/SEO | Bảo đảm trang chi tiết có nội dung và metadata dễ được tìm thấy; chọn SSR/SSG hoặc phương án tương đương theo stack | Cần chốt |

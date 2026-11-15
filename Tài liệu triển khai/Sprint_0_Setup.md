@@ -16,32 +16,32 @@ Cuối Sprint 0, chủ dự án có thể chạy giao diện, API và database d
 
 Sprint 0 chưa xây chức năng nghiệp vụ cho khách thuê. Chỉ tạo khung dự án và một endpoint kiểm tra sức khỏe để xác nhận các thành phần nối được với nhau.
 
-## 3. Đề xuất stack cho MVP
+## 3. Stack cho MVP (Cập nhật MongoDB 8 theo `ADR-S0-01`)
 
-Stack này là đề xuất thực hiện để giảm mơ hồ trong Sprint 0. Cần chủ dự án xác nhận trước khi bắt đầu phát triển chức năng; các tài liệu BA hiện vẫn để công nghệ database/hosting mở.
+Stack thực tế đã được chủ dự án chốt:
 
-| Lớp | Đề xuất | Lý do |
+| Lớp | Công nghệ | Lý do |
 |---|---|---|
 | Giao diện | React + Vite, JavaScript | Khởi tạo nhanh; dùng chung ứng dụng cho public và admin, tách route/layout |
 | API | Node.js 24 LTS + Express 5 | Dùng một runtime JavaScript ở client tooling và backend; phù hợp REST API MVP |
-| Database dev | PostgreSQL 18 chạy bằng Docker Compose | Dữ liệu phòng, ảnh, admin và trạng thái có quan hệ; local setup lặp lại được |
-| Truy cập database | pgAdmin nếu cần giao diện; psql/Docker CLI cho thao tác kỹ thuật | pgAdmin đã có trong môi trường theo danh sách ứng dụng; cần xác nhận chạy được |
+| Database dev | MongoDB 8 (`mongo:8`) chạy bằng Docker Compose | Dữ liệu phòng, mảng ảnh nhúng và danh mục tiện nghi phù hợp tự nhiên với mô hình tài liệu |
+| Truy cập database | MongoDB Compass hoặc `mongosh` qua Docker CLI | Dễ quan sát collection/document/index cục bộ |
 | Quản lý mã nguồn | Git, một repository | Gộp client/server và tài liệu; main luôn giữ trạng thái chạy được |
-| Ảnh production | Chưa chọn; quyết định ở sprint triển khai | Local dev có thể dùng thư mục không commit; production cần nơi lưu bền vững |
+| Ảnh production | Chưa chọn; quyết định ở sprint triển khai | Local dev dùng `server/uploads/`; production dùng object storage bền vững |
 
-**Quyết định ADR-S0-01 cần ghi:** chấp thuận PostgreSQL 18 thay cho phương án MongoDB từng được đề xuất ban đầu, hoặc giữ MongoDB và cập nhật các bước database/API trước khi tạo schema. Không triển khai đồng thời hai database.
+**Quyết định ADR-S0-01 đã chốt:** Chuyển toàn bộ từ PostgreSQL 18 sang MongoDB 8 (driver chính thức `mongodb`), không triển khai đồng thời hai database.
 
 ## 4. Công cụ cần có
 
 | Công cụ | Mục đích | Tình trạng quan sát được trên máy |
 |---|---|---|
-| Node.js 24 LTS | Chạy Vite, Express và npm | Có Node v24.14.0; nên cập nhật lên bản vá 24.x LTS mới nhất rồi thống nhất phiên bản dự án |
-| npm | Cài thư viện và chạy scripts | Có npm 11.9.0; đi kèm Node.js, không cần cài riêng |
+| Node.js 24 LTS | Chạy Vite, Express và npm | Có Node v24.14.0 |
+| npm | Cài thư viện và chạy scripts | Có npm 11.9.0 |
 | Git for Windows | Lịch sử mã nguồn và nhánh | Có Git 2.53.0.windows.3 |
-| Docker Desktop + Docker Compose | Chạy PostgreSQL 18 local và dịch vụ dev | Có Docker 29.3.1; cần mở Docker Desktop và xác nhận Docker Engine hoạt động |
-| IDE | Sửa code, terminal, debug | WebStorm đã có trong danh sách ứng dụng; có thể dùng IDE sẵn có |
-| Trình duyệt | Kiểm tra giao diện responsive | Google Chrome đã có trong môi trường |
-| pgAdmin | Xem database bằng giao diện | Ứng dụng có trong môi trường; dùng tùy chọn, không bắt buộc |
+| Docker Desktop + Docker Compose | Chạy MongoDB 8 local và dịch vụ dev | Có Docker 29.3.1; cần mở Docker Desktop và xác nhận Docker Engine hoạt động |
+| IDE | Sửa code, terminal, debug | VS Code / WebStorm hoặc IDE sẵn có |
+| Trình duyệt | Kiểm tra giao diện responsive | Google Chrome |
+| MongoDB Compass (tùy chọn) | Xem collections/documents bằng giao diện | Tùy chọn |
 
 Vite hiện yêu cầu Node.js 20.19+ hoặc 22.12+; Express 5 yêu cầu Node.js 18+. Node 24 đáp ứng cả hai. Tài liệu Node hiện liệt kê Node 24 và Node 26 ở trạng thái LTS; dự án chọn một major và ghi trong file .nvmrc hoặc .node-version để mọi môi trường dùng nhất quán. Không cần nâng lên major khác chỉ để chạy Vite. Kiểm tra bản vá mới nhất tại thời điểm cài.
 
@@ -117,7 +117,7 @@ Tại thư mục gốc:
 New-Item -ItemType Directory -Path server -Force
 Set-Location server
 npm init -y
-npm install express@5 helmet zod pg dotenv
+npm install express@5 helmet zod mongodb dotenv
 npm install --save-dev nodemon
 ~~~
 
@@ -125,39 +125,41 @@ Tạo khung server với:
 
 - GET /api/v1/health — trả trạng thái API; nếu đã kết nối DB thì trả trạng thái DB riêng.
 - Middleware JSON, xử lý lỗi tập trung và Helmet.
-- Cấu hình đọc từ biến môi trường.
+- Cấu hình đọc từ biến môi trường (`MONGODB_URI`, `MONGODB_DB_NAME`).
 - Chưa có API nào được quyền ghi tin trong Sprint 0.
 
-Scripts package.json tối thiểu: dev (nodemon), start (node). Tên file entry có thể là src/server.js. Chưa cần cài ORM/migration framework cho tới khi mô hình dữ liệu ở Data Analysis được chủ dự án chốt.
+Scripts package.json tối thiểu: `dev` (`nodemon`), `start` (`node`), `db:init` (`node scripts/init-db.js`). Tên file entry là `src/server.js`.
 
 ## 9. Database local bằng Docker Compose
 
-Tạo compose.yaml ở thư mục gốc. Ví dụ dưới đây chạy database chỉ trên máy local; không mở cổng database ra Internet:
+Tạo `compose.yaml` ở thư mục gốc. Cấu hình dưới đây chạy MongoDB 8 chỉ trên máy local; không mở cổng database ra Internet:
 
 ~~~yaml
 services:
   db:
-    image: postgres:18
+    image: mongo:8
+    container_name: room-rental-mongo
     restart: unless-stopped
     environment:
-      POSTGRES_DB: room_rental_dev
-      POSTGRES_USER: room_rental_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-room_rental_app}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in the root .env file}
+      MONGO_INITDB_DATABASE: room_rental_dev
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:27018:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U room_rental_app -d room_rental_dev"]
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 volumes:
-  postgres_data:
+  mongo_data:
 ~~~
 
-Tạo file .env local (không commit) với POSTGRES_PASSWORD có giá trị do chủ dự án tự đặt. Thêm .env vào .gitignore; trong .env.example chỉ ghi tên biến và giá trị placeholder, không ghi mật khẩu thật.
+Tạo file `.env` local (không commit) với `MONGO_INITDB_ROOT_PASSWORD` và `MONGODB_URI` tương ứng. Thêm `.env` vào `.gitignore`; trong `.env.example` chỉ ghi tên biến và giá trị placeholder, không ghi mật khẩu thật.
 
 Lệnh vận hành:
 
@@ -165,11 +167,11 @@ Lệnh vận hành:
 docker compose up -d db
 docker compose ps
 docker compose logs db
-docker compose exec db pg_isready -U room_rental_app -d room_rental_dev
+docker compose exec db mongosh --quiet --eval "db.adminCommand('ping')"
 docker compose down
 ~~~
 
-docker compose down giữ volume dữ liệu. Không dùng docker compose down -v khi chưa muốn xóa database local. Với Docker Official Image PostgreSQL 18, mount dữ liệu tại /var/lib/postgresql; không dùng ví dụ cũ /var/lib/postgresql/data của các major trước 18.
+`docker compose down` giữ volume dữ liệu `mongo_data`. Không dùng `docker compose down -v` khi chưa muốn xóa database local. Với Docker Official Image MongoDB 8, dữ liệu lưu tại `/data/db`.
 
 ## 10. Cấu hình môi trường và bảo mật
 
@@ -190,7 +192,7 @@ docker compose down giữ volume dữ liệu. Không dùng docker compose down -
 | S0-03 | Khởi tạo Git repository, main, .gitignore, .editorconfig | Repo sạch, không có secret/artifact build |
 | S0-04 | Tạo client Vite React và chạy dev server | Trang mẫu mở được trên localhost |
 | S0-05 | Tạo server Express và endpoint health | API trả trạng thái khỏe |
-| S0-06 | Tạo Compose database và volume bền vững | PostgreSQL 18 healthy, kết nối local thành công |
+| S0-06 | Tạo Compose database và volume bền vững | MongoDB 8 healthy, kết nối local thành công |
 | S0-07 | Tạo .env.example và README chạy local | Có thể dựng môi trường theo hướng dẫn |
 | S0-08 | Kiểm tra luồng client → health API và API → database | Các thành phần nối đúng; chưa triển khai nghiệp vụ CRUD |
 
@@ -215,25 +217,26 @@ Sprint 1 chỉ bắt đầu sau khi stack được chốt. Backlog đầu tiên 
 - [Node.js release schedule](https://nodejs.org/en/about/previous-releases)
 - [Vite Getting Started và yêu cầu Node.js](https://vite.dev/guide/)
 - [Express 5 installation](https://expressjs.com/en/5x/starter/installing/)
-- [Docker Official Image cho PostgreSQL](https://github.com/docker-library/docs/blob/master/postgres/README.md)
+- [Docker Official Image cho MongoDB](https://hub.docker.com/_/mongo)
+- [MongoDB Node.js Driver Documentation](https://www.mongodb.com/docs/drivers/node/current/)
 - [Scrum Guide](https://scrumguides.org/scrum-guide)
 
 Các phiên bản công cụ trong bảng phản ánh trạng thái kiểm tra ngày 07/11/2026; kiểm tra trang chính thức một lần nữa khi cài hoặc nâng cấp.
 
-## 15. Ghi nhận thực hiện Sprint 0 — 09/11/2026
+## 15. Ghi nhận thực hiện Sprint 0 — 12/11/2026
 
 ### 15.1. Quyết định và kết quả đã tạo
 
 | Mã | Trạng thái | Kết quả |
 |---|---|---|
 | S0-01 | Hoàn tất cho bootstrap | Chọn React/Vite, Express 5, Node 24 LTS, PostgreSQL 18; quyết định ghi ở docs/adr/ADR-S0-01-Stack.md. |
-| S0-02 | Một phần | Node v24.14.0, npm 11.9.0, Git 2.53.0, Docker CLI 29.3.1 và Compose 5.1.1 có sẵn. Docker Linux Engine chưa kết nối được. |
+| S0-02 | Hoàn tất | Node v24.14.0, npm 11.9.0, Git 2.53.0, Docker Engine 29.3.1 và Compose 5.1.1 hoạt động. PostgreSQL máy chủ đã có trên 5432; project dùng host port 5433. |
 | S0-03 | Hoàn tất | Đã tạo Git repository nhánh main, .gitignore, .editorconfig, .nvmrc và mẫu env; chưa tạo commit. |
 | S0-04 | Hoàn tất | React/Vite client đã scaffold, cài dependencies, tạo trang nền tảng và cấu hình proxy API; npm run build thành công. |
-| S0-05 | Một phần | Express API, Helmet, Zod, pg, dotenv, nodemon và health live/ready đã được tạo. API khởi động được; chưa xác nhận response HTTP qua loopback. |
-| S0-06 | Bị chặn bởi môi trường | Compose cho PostgreSQL 18 đã được tạo và docker compose config --quiet hợp lệ; không thể tạo container vì Docker Engine chưa chạy. |
+| S0-05 | Hoàn tất | Express API, Helmet, Zod, pg, dotenv, nodemon và health live/ready đã được tạo. Health live và ready đều trả HTTP 200; ready báo database connected. |
+| S0-06 | Hoàn tất | PostgreSQL 18.6 chạy healthy qua Compose tại 127.0.0.1:5433; driver pg truy vấn database room_rental_dev thành công. |
 | S0-07 | Hoàn tất | Có README root, .env.example và .env local được sinh tự động; .env nằm trong .gitignore. |
-| S0-08 | Chưa hoàn tất | Chưa xác nhận client → API → PostgreSQL vì Engine không hoạt động và môi trường hiện tại chặn kết nối loopback (EACCES). |
+| S0-08 | Hoàn tất | Trang Vite trả HTTP 200; health endpoint qua proxy frontend trả HTTP 200 và báo database connected. |
 
 ### 15.2. Definition of Done hiện tại
 
@@ -242,28 +245,27 @@ Các phiên bản công cụ trong bảng phản ánh trạng thái kiểm tra n
 - [x] Client cài dependencies, khởi động được và production build thành công.
 - [x] API dependencies đã cài, mã nguồn qua kiểm tra cú pháp và tiến trình dev khởi động được.
 - [x] README hướng dẫn setup/start/stop local đã có.
-- [ ] Docker Linux Engine hoạt động và PostgreSQL 18 báo healthy.
-- [ ] API readiness báo database connected.
-- [ ] Client gọi được health endpoint qua proxy.
-- [ ] Kiểm tra dữ liệu PostgreSQL còn nguyên sau khi container restart.
+- [x] Docker Linux Engine hoạt động và PostgreSQL 18 báo healthy.
+- [x] API readiness báo database connected.
+- [x] Client gọi được health endpoint qua proxy.
+- [x] Kiểm tra dữ liệu PostgreSQL còn nguyên sau khi container restart; bảng kiểm tra tạm đã được xóa.
 
-Sprint 0 **chưa hoàn tất** cho đến khi các mục chưa đánh dấu ở trên đạt.
+Sprint 0 **hoàn tất cho nền tảng local**. Production hosting, nội dung thật, nghiệp vụ CRUD và tài khoản admin chưa thuộc Sprint 0.
 
-### 15.3. Việc cần thực hiện trên máy để gỡ chặn
+### 15.3. Kết quả kiểm tra chi tiết
 
-1. Chủ dự án mở Docker Desktop từ Start Menu và chờ trạng thái Engine sẵn sàng. Lần kiểm tra hiện tại, Docker Desktop chưa tạo được daemon và Computer Use bị dừng bằng phím Esc nên không thể tiếp tục thao tác giao diện.
-2. Tại PowerShell ở thư mục repository chạy:
-
-~~~powershell
-docker info
-docker compose up -d db
-docker compose ps
-npm --prefix server run dev
-npm --prefix client run dev
-~~~
-
-3. Mở http://127.0.0.1:5173; trang cần báo API hoạt động và database connected. Health API: http://127.0.0.1:3000/api/v1/health/live và http://127.0.0.1:3000/api/v1/health/ready.
-4. Nếu Docker Desktop báo cần bật WSL/virtualization hoặc cần quyền quản trị hệ thống, chủ dự án xử lý qua cấu hình/hướng dẫn chính thức của Docker/Windows. Không xóa volume hiện có.
-5. Sau khi readiness đạt, khởi động lại container và xác nhận volume còn dữ liệu trước khi đánh dấu Sprint 0 hoàn tất.
+- Docker Engine 29.3.1 chạy; container room-rental-db dùng image postgres:18 và healthcheck báo healthy.
+- Port mapping là 127.0.0.1:5433 → container 5432 vì PostgreSQL local có sẵn giữ/cản bind cổng host 5432. PostgreSQL hiện có không bị dừng hay thay đổi.
+- PostgreSQL trả version 18.6; driver pg kết nối được database room_rental_dev qua DATABASE_URL.
+- GET /api/v1/health/live và GET /api/v1/health/ready trả HTTP 200; readiness xác nhận dependencies.database=connected.
+- Frontend tại http://127.0.0.1:5173 trả HTTP 200; /api/v1/health/ready qua Vite proxy cũng trả HTTP 200.
+- Tạo marker trong database project, restart container, xác nhận marker còn tồn tại rồi xóa bảng marker.
+- Các tiến trình API và Vite đang chạy trong phiên dev; dừng bằng Ctrl+C tại phiên tương ứng.
 
 Lần thực hiện này không triển khai production, không tạo schema nghiệp vụ, không thêm CRUD hoặc đăng nhập admin; các phần đó thuộc sprint sản phẩm tiếp theo.
+
+## 16. Chuyển đổi cơ sở dữ liệu sang MongoDB 8 — 15/11/2026
+
+- Chủ dự án quyết định chuyển toàn bộ hệ thống sang **MongoDB 8** (driver chính thức `mongodb`) theo cập nhật [ADR-S0-01-Stack.md](<../docs/adr/ADR-S0-01-Stack.md>).
+- `compose.yaml` chạy service `db` dùng image `mongo:8` (`room-rental-mongo`), bind `127.0.0.1:27018:27017` (tránh xung đột `mongod` local đang chiếm `27017`) và volume `mongo_data`.
+- Đã gỡ bỏ gói `pg`, `server/src/db/pool.js`, `server/scripts/migrate.js` và thư mục `server/migrations/*.sql`; thay bằng `server/src/db/mongo.js` và `server/scripts/init-db.js`.

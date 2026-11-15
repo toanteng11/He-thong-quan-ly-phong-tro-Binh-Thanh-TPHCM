@@ -102,9 +102,36 @@
 - Không dùng màu đỏ/xanh làm chỉ báo trạng thái duy nhất; kèm chữ.
 - Ảnh cần rõ, đúng phòng và không bị kéo méo; ưu tiên tải ảnh theo kích thước cần hiển thị.
 
-## 9. Định hướng hình ảnh
+## 9. Định hướng hình ảnh, Hệ thống Màu sắc và Typography
 
-Giao diện khách dùng nền sáng, khoảng trắng thoáng, màu nhấn nhất quán và ảnh phòng làm trọng tâm. Khu quản trị thiên về tính thực dụng, bảng dễ quét, trạng thái dễ phân biệt. Logo, font và màu thương hiệu là dữ liệu cần chủ dự án cung cấp hoặc phê duyệt.
+Giao diện khách và quản trị dùng chung ngôn ngữ thị giác **"Saigon Tropical Living & Modern Hospitality"**: nền ấm nhẹ để tôn vinh hình ảnh thật của căn phòng, màu xanh ngọc đậm tạo cảm giác an tâm minh bạch, điểm nhấn đất nung ấm áp gợi cảm giác nhà ở, kết hợp hệ thống chữ sắc nét đạt chuẩn tương phản WCAG AA.
+
+### 9.1. Hệ thống Màu sắc chuẩn (Color System)
+
+| Nhóm | Token CSS | Giá trị Hex | Mục đích & Tương phản |
+|---|---|---|---|
+| Nền trang & Bề mặt | `--bg-canvas` / `--bg-subtle` / `--bg-surface` | `#F7F5F0` / `#EFECE6` / `#FFFFFF` | Nền ngà ấm dịu mắt; thẻ/bảng trắng tinh khiết tách lớp rõ ràng. |
+| Thương hiệu chính (Deep Jade) | `--brand-600` / `--brand-700` / `--brand-100` | `#1B634B` / `#154D3A` / `#E3F2EC` | Nút hành động chính, focus ring (`--brand-500: #247A5D`), điều hướng đang chọn. |
+| Điểm nhấn ấm (Terracotta) | `--accent-600` / `--accent-700` / `--accent-100` | `#C5532B` / `#A84420` / `#FCEEE9` | Huy hiệu nổi bật, điểm nhấn phụ ấm áp (không thay thế màu lỗi). |
+| Hệ thống chữ (Ink) | `--ink-900` / `--ink-700` / `--ink-500` / `--ink-400` | `#12201B` / `#2B3D36` / `#4E6058` / `#687A72` | Tiêu đề/giá (`14.5:1`), nội dung (`9.8:1`), nhãn phụ (`5.7:1`), metadata (`4.2:1`). |
+| Còn trống (`AVAILABLE`) | `--status-avail-text` / `--status-avail-bg` | `#11613B` / `#E6F5EC` (viền `#AEE0C2`) | Luôn đi kèm chữ "Còn trống" và chấm chỉ báo `#16A34A`. |
+| Đã thuê (`RENTED`) | `--status-rented-text` / `--status-rented-bg` | `#9A4212` / `#FEF1E8` (viền `#F9C8A9`) | Luôn đi kèm chữ "Đã thuê" và chấm chỉ báo `#EA580C`. |
+| Đang hiển thị (`PUBLISHED`) | `--status-pub-text` / `--status-pub-bg` | `#0E5A46` / `#E2F3EE` (viền `#A3D9C9`) | Luôn đi kèm chữ "Đang hiển thị". |
+| Bản nháp (`DRAFT`) | `--status-draft-text` / `--status-draft-bg` | `#85580A` / `#FEF7E0` (viền `#F5D680`) | Luôn đi kèm chữ "Bản nháp". |
+| Đã ẩn (`HIDDEN`) | `--status-hidden-text` / `--status-hidden-bg` | `#475467` / `#F2F4F7` (viền `#D0D5DD`) | Luôn đi kèm chữ "Đã ẩn". |
+| Lỗi / Xóa (`DANGER`) | `--danger-text` / `--danger-bg` | `#B42318` / `#FEF3F2` (viền `#FECDCA`) | Thông báo lỗi xác thực và cảnh báo thao tác phá hủy. |
+
+### 9.2. Quy chuẩn Typography Scale
+
+- **Font chữ**: `Plus Jakarta Sans` cho giao diện điều khiển, bảng biểu, giá thuê (số liệu rõ ràng) và `Newsreader` (serif tinh tế) cho tiêu đề lớn; fallback về system sans/serif.
+- **Kích thước tối thiểu bắt buộc (không dùng dưới 12px cho nội dung đọc)**:
+  - Hero Title: `clamp(2.25rem, 4vw, 3.35rem)`
+  - Page Title (H1): `clamp(1.625rem, 2.4vw, 2.15rem)`
+  - Section Title (H2): `1.25rem` (`20px`)
+  - Card Title (H3): `1.0625rem` (`17px`)
+  - Nội dung chính / Mô tả: `0.9375rem` (`15px`), `line-height: 1.65`
+  - Form Input / Nút bấm / Ô bảng: `0.875rem` (`14px`)
+  - Nhãn trạng thái / Chú thích / Tiêu đề cột bảng: `0.75rem–0.8125rem` (`12px–13px`)
 
 ## 10. Nội dung thiết kế đã chốt và phần chờ chủ dự án cung cấp
 

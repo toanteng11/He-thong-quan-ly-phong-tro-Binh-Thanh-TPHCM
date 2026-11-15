@@ -176,33 +176,40 @@ Các quy tắc dưới đây là baseline triển khai cho bản đầu; các m�
 
 ### 11.1. Một tin và địa chỉ
 
-- Một RoomListing đại diện đúng một phòng thuê độc lập.
-- Một tòa nhà/địa chỉ có nhiều phòng thì mỗi phòng có listing riêng, có thể dùng cùng building/address reference.
-- MVP giới hạn vùng kinh doanh Bình Thạnh nhưng lưu regionId/district/ward theo cấu trúc mở rộng, không ghép toàn bộ vào một chuỗi.
-- Lưu tách addressPublic (khu vực/phường hiển thị mặc định) và addressPrivate (địa chỉ đầy đủ nếu cần). API public chỉ trả địa chỉ đầy đủ khi allowExactAddress=true do admin bật.
+- Một RoomListing tương ứng một document trong collection `room_listings`, đại diện đúng một phòng thuê độc lập.
+- Một tòa nhà/địa chỉ có nhiều phòng thì mỗi phòng có document riêng, có thể dùng cùng thông tin khu vực/địa chỉ.
+- MVP giới hạn vùng kinh doanh Bình Thạnh nhưng lưu `ward`/`district`/`city` theo cấu trúc mở rộng, không ghép toàn bộ vào một chuỗi.
+- Lưu tách `publicAddress` (khu vực/phường hiển thị mặc định) và `privateAddress` (địa chỉ đầy đủ). API public chỉ trả địa chỉ đầy đủ khi `allowExactAddress=true` do admin bật.
 
-### 11.2. Trường bắt buộc trước khi xuất bản
+### 11.2. Trường dữ liệu MongoDB & quy tắc xuất bản
 
-| Trường | Bắt buộc | Quy tắc |
-|---|---|---|
-| title | Có | 10–120 ký tự; văn bản thuần |
-| description | Có | 30–5.000 ký tự; escape khi hiển thị |
-| roomType | Có | Giá trị trong danh mục được quản lý |
-| priceVndPerMonth | Có | Số nguyên dương |
-| areaSqm | Có | Số > 0, tối đa 2 chữ số thập phân |
-| addressPublic | Có | Khu vực/phường đủ để định vị |
-| occupancyStatus | Có | AVAILABLE hoặc RENTED |
-| contact channel | Có | Ít nhất một kênh hợp lệ được đánh dấu public |
-| images | Có | Tối thiểu 1, tối đa 15 ảnh hợp lệ |
-| publishStatus | Có | DRAFT/PUBLISHED/HIDDEN |
+Toàn bộ document trong MongoDB (`room_listings`, `admin_accounts`, `admin_sessions`, `audit_events`) dùng khóa chính `_id` dạng UUID string và tên trường camelCase đồng nhất với JSON API để không phát sinh lớp ánh xạ dư thừa:
 
-Backend kiểm tra lại toàn bộ quy tắc khi đổi publishStatus sang PUBLISHED. Lỗi trường không làm mất bản nháp hoặc thay đổi trạng thái hiện tại.
+| Trường MongoDB & API | Kiểu BSON / JSON | Bắt buộc để xuất bản | Quy tắc |
+|---|---|---|---|
+| `_id` (API: `id`) | String (UUID v4) | Có | Sinh tại server, bất biến |
+| `title` | String | Có | 10–120 ký tự; văn bản thuần |
+| `description` | String | Có | 30–5.000 ký tự; escape khi hiển thị |
+| `roomType` | String | Có | Giá trị trong danh mục được quản lý |
+| `priceVnd` | Number (Int) | Có | Số nguyên dương (VND/tháng) |
+| `areaM2` | Number (Double) | Có | Số > 0, tối đa 2 chữ số thập phân (m²) |
+| `amenities` | Array\<String\> | Tùy chọn | Tối đa 30 tiện nghi trong danh mục chuẩn |
+| `publicAddress` (+ `ward`, `district`, `city`) | String | Có | Khu vực/phường đủ để định vị |
+| `privateAddress` | String | Khi bật `allowExactAddress` | Địa chỉ chi tiết; chỉ trả public khi `allowExactAddress = true` |
+| `availability` | String | Có | `AVAILABLE` hoặc `RENTED` |
+| `contactPhone` / `contactZalo` | String | Có ít nhất 1 kênh public | Ít nhất một kênh hợp lệ được bật `allowPublicPhone` hoặc `allowPublicZalo` |
+| `images` | Embedded Array\<Object\> | Có | Mảng subdocument nhúng trực tiếp trong `room_listings`; tối thiểu 1, tối đa 15 ảnh hợp lệ |
+| `publishStatus` | String | Có | `DRAFT` / `PUBLISHED` / `HIDDEN` |
+| `version` | Number (Int) | Có | Tăng nguyên tử mỗi lần cập nhật để kiểm soát ghi đồng thời |
+| `publishedAt`, `deletedAt`, `createdAt`, `updatedAt` | Date | Tự động | `publishedAt`/`deletedAt` có thể `null`; lưu UTC |
+
+Backend kiểm tra lại toàn bộ quy tắc khi đổi `publishStatus` sang `PUBLISHED` (hoặc khi cập nhật tin đang `PUBLISHED`). Lỗi trường không làm mất bản nháp hoặc thay đổi trạng thái hiện tại.
 
 ### 11.3. Ảnh và vòng đời lưu trữ
 
 - Cho phép JPEG, PNG và WebP; tối đa 10 MB/tệp, tối đa 15 ảnh/listing.
 - Kiểm tra chữ ký nội dung/MIME, kích thước file, tên tệp do hệ thống tạo; từ chối SVG, HTML, executable và định dạng không hỗ trợ.
-- Tạo thumbnail và kích thước hiển thị; metadata gồm imageId, listingId, storageKey, mimeType, byteSize, width/height, sortOrder, isCover, createdAt.
+- Ảnh được nhúng thành mảng `images[]` bên trong document `room_listings` (giới hạn 15 phần tử giúp document luôn gọn nhẹ và cho phép thêm/sắp xếp/đổi ảnh bìa/xóa ảnh nguyên tử trên một document đơn lẻ). Metadata mỗi phần tử gồm `id`, `storageKey`, `mimeType`, `byteSize`, `originalName`, `altText`, `sortOrder`, `isCover`, `createdAt`.
 - Ảnh chưa liên kết tin phải được dọn theo chính sách orphan; ảnh của tin soft-deleted vẫn giữ theo retention để có thể khôi phục.
 - Xóa vật lý ảnh chỉ sau retention và không ảnh hưởng backup; thao tác phải theo chính sách lưu trữ.
 
@@ -218,9 +225,9 @@ Backend kiểm tra lại toàn bộ quy tắc khi đổi publishStatus sang PUBL
 
 | Loại | Ví dụ | Quyền |
 |---|---|---|
-| Public approved | tiêu đề, giá, diện tích, tiện nghi, ảnh, addressPublic, contactPublic được bật | public API |
-| Private listing | addressPrivate, ghi chú quản trị, trạng thái xóa, audit metadata | admin/DB; không trả public |
-| Credential/secret | password hash, session identifier, DB/storage secret | hệ thống hạn chế; không log hoặc trả API |
+| Public approved | `title`, `roomType`, `priceVnd`, `areaM2`, `amenities`, `images`, `publicAddress` (và `privateAddress` chỉ khi `allowExactAddress=true`), `contact` được bật public | public API |
+| Private listing | `privateAddress` (khi chưa bật công khai), ghi chú quản trị, `deletedAt`, audit metadata | admin/DB; không trả public |
+| Credential/secret | `passwordHash`, session token hash, DB/storage secret | hệ thống hạn chế; không log hoặc trả API |
 | Backup | snapshot DB và storage | tài khoản riêng/quyền hạn chế, mã hóa khi provider hỗ trợ |
 
 Không thu thập tên/điện thoại/email của khách trong phiên bản đầu. Log web hạn chế giữ query string có thể chứa dữ liệu cá nhân.
@@ -230,7 +237,7 @@ Không thu thập tên/điện thoại/email của khách trong phiên bản đ�
 - Backup database và object storage mỗi ngày; giữ tối thiểu 7 bản ngày và 4 bản tuần, lưu tách failure domain.
 - Mục tiêu RPO ≤24 giờ, RTO ≤1 ngày làm việc; kiểm tra khôi phục ít nhất trước go-live và định kỳ theo chính sách vận hành.
 - Không xem trạng thái “backup job thành công” thay cho restore test.
-- Public list phải phân trang; chỉ mục tối thiểu cho publishStatus, deletedAt, occupancyStatus, priceVndPerMonth, areaSqm, updatedAt và khóa vùng phù hợp truy vấn.
+- Public list phải phân trang; compound index trên `room_listings` tối thiểu gồm `{ publishStatus: 1, deletedAt: 1, availability: 1, publishedAt: -1, updatedAt: -1 }`, `{ publishStatus: 1, deletedAt: 1, ward: 1 }`, `{ publishStatus: 1, deletedAt: 1, roomType: 1, priceVnd: 1 }`, `{ deletedAt: 1, updatedAt: -1 }` và `{ _id: 1, "images.id": 1 }`.
 - Xóa cache/CDN khi publish/hide/status/ảnh thay đổi; bản public mới xuất hiện tối đa 60 giây sau khi save thành công.
 - Mọi backup failure phải tạo cảnh báo đến đầu mối vận hành.
 

@@ -23,18 +23,20 @@ API nối public web/admin web với backend. Public API chỉ đọc tin đã x
 
 | Method | Endpoint | Mục đích | Tham số/đầu vào | Quyền |
 |---|---|---|---|---|
-| GET | /api/v1/public/rooms | Lấy danh sách tin công khai | q, ward, minPriceVnd, maxPriceVnd, minAreaM2, maxAreaM2, availability, page, pageSize, sort | Không cần |
+| GET | /api/v1/public/rooms | Lấy danh sách tin công khai | q, ward, roomType, minPriceVnd, maxPriceVnd, minAreaM2, maxAreaM2, availability, page, pageSize, sort | Không cần |
 | GET | /api/v1/public/rooms/{roomId} | Xem chi tiết tin | roomId | Không cần |
-| GET | /api/v1/public/categories | Lấy loại phòng/tiện nghi nếu được cấu hình thành danh mục | page/pageSize nếu danh sách dài | Không cần |
+| GET | /api/v1/public/rooms/{roomId}/images/{imageId}/file | Tải ảnh thuộc tin đang xuất bản | roomId, imageId | Không cần (chặn nếu tin chưa xuất bản hoặc đã xóa mềm) |
+| GET | /api/v1/public/categories | Lấy loại phòng/tiện nghi được cấu hình | — | Không cần |
 
-Quy tắc: API công khai luôn giới hạn publishStatus = PUBLISHED. Mặc định sắp xếp phòng còn trống trước, sau đó theo ngày xuất bản mới nhất. Không nhận tham số cho phép khách lấy tin nháp/ẩn.
+Quy tắc: API công khai luôn giới hạn `publishStatus = PUBLISHED` và `deletedAt IS NULL`. Mặc định sắp xếp phòng còn trống trước, sau đó theo ngày xuất bản mới nhất. Không nhận tham số cho phép khách lấy tin nháp/ẩn.
 
 ## 4. Endpoint xác thực admin
 
 | Method | Endpoint | Mục đích | Quyền |
 |---|---|---|---|
-| POST | /api/v1/admin/auth/login | Xác thực tài khoản và tạo phiên | Công khai nhưng có giới hạn thử |
-| POST | /api/v1/admin/auth/logout | Kết thúc phiên hiện tại | Admin đã đăng nhập |
+| POST | /api/v1/admin/auth/login | Xác thực tài khoản và tạo phiên | Công khai nhưng có giới hạn thử + kiểm tra Origin |
+| POST | /api/v1/admin/auth/change-password | Đổi mật khẩu khởi tạo bắt buộc ở lần đầu | Admin đã đăng nhập (cần Origin hợp lệ) |
+| POST | /api/v1/admin/auth/logout | Kết thúc phiên hiện tại | Admin đã đăng nhập (cần Origin hợp lệ) |
 | GET | /api/v1/admin/auth/me | Kiểm tra phiên hiện tại | Admin đã đăng nhập |
 
 Thông tin đăng nhập không được ghi vào log. Sai email hoặc mật khẩu trả thông báo chung, không tiết lộ tài khoản có tồn tại hay không.
@@ -56,7 +58,8 @@ Thông tin đăng nhập không được ghi vào log. Sai email hoặc mật kh
 
 | Method | Endpoint | Mục đích | Quyền |
 |---|---|---|---|
-| POST | /api/v1/admin/rooms/{roomId}/images | Tải một hoặc nhiều ảnh lên tin | Admin |
+| POST | /api/v1/admin/rooms/{roomId}/images | Tải một ảnh lên tin (trường multipart `file`) | Admin |
+| GET | /api/v1/admin/rooms/{roomId}/images/{imageId}/file | Đọc tệp ảnh trong khu quản trị/xem trước | Admin |
 | PATCH | /api/v1/admin/rooms/{roomId}/images/order | Cập nhật thứ tự/ảnh bìa | Admin |
 | DELETE | /api/v1/admin/rooms/{roomId}/images/{imageId} | Gỡ ảnh khỏi tin | Admin |
 
@@ -183,7 +186,7 @@ Các giá trị mặc định 12/48 và trường tìm kiếm là baseline hợp
 - Khi xóa ảnh bìa, trả lại ảnh bìa mới hoặc trạng thái không có ảnh bìa theo quy tắc đã thống nhất.
 - Các thao tác tạo/sửa/xóa ảnh cập nhật updatedAt của tin và không được làm lộ ảnh thuộc tin nháp qua public API.
 
-Quy ước upload: multipart/form-data, mỗi file gửi trong phần files; backend trả danh sách imageId, URL xem trước cho admin, thứ tự và lỗi riêng theo từng file. Frontend và API dùng chung hợp đồng này.
+Quy ước upload (thống nhất với `ADR-S1-01`): `multipart/form-data`, mỗi request tải lên một ảnh qua trường `file` để kiểm soát tiến trình và báo lỗi độc lập cho từng tệp khi chọn nhiều ảnh ở client; backend trả về `item` gồm `id`, `mimeType`, `byteSize`, `originalName`, `altText`, `sortOrder`, `isCover` và `url` xem trước an toàn cho admin.
 
 ## 15. Hợp đồng xác thực và danh sách quản trị
 
@@ -202,9 +205,9 @@ GET /api/v1/admin/rooms hỗ trợ q, publishStatus, availability, page, pageSiz
 
 ## 16. Danh sách trường được phép công khai
 
-Public list response: id, title, priceVnd, areaM2, publicAddress, availability, coverImageUrl và publishedAt/updatedAt theo quyết định hiển thị.
+Public list response (`GET /api/v1/public/rooms`): `id`, `title`, `roomType`, `priceVnd`, `areaM2`, `amenities`, `ward`, `district`, `city`, `publicAddress`, `availability`, `coverImageUrl`, `publishedAt`, `updatedAt`.
 
-Public detail response có thể thêm description, amenities, gallery và contactPublic. Không trả addressPrivate, internalNotes, deletedAt, createdBy, updatedBy, email admin hoặc trạng thái phiên. publicAddress và contactPublic được giới hạn theo quyền công khai từng tin ở server-side.
+Public detail response (`GET /api/v1/public/rooms/{roomId}`): bổ sung `description`, `displayAddress`, `exactAddress` (chỉ có khi `allowExactAddress = true`), `images` (mảng `{ id, mimeType, altText, sortOrder, isCover, url }`) và `contact` (`{ phone, zalo }` — chỉ chứa kênh được bật `allowPublicPhone` / `allowPublicZalo`). Tuyệt đối không trả `privateAddress` khi chưa cho phép, ghi chú nội bộ, `deletedAt`, `createdBy`, `updatedBy`, email admin hoặc trạng thái phiên.
 ## 17. Hợp đồng API cho production
 
 Các quy tắc trong phần này có hiệu lực cho API public và admin, bổ sung các endpoint ở trên.
@@ -241,10 +244,10 @@ Health endpoints không được trả stack trace, host nội bộ, biến môi
 
 ### 17.4. Phân trang, dữ liệu public và lỗi
 
-- Mặc định pageSize 12; tối đa 48; response có items, page/limit hoặc cursor, total khi khả thi, hasNext.
-- Query min/max phải hợp lệ; min lớn hơn max trả 400 với mã lỗi ổn định; không nối query client thành SQL.
-- API public chỉ trả tiêu đề, slug/id, giá, diện tích, vùng địa chỉ được phép, tiện nghi public, trạng thái phòng, thời gian cập nhật và media URLs.
-- Chi tiết public chỉ truy xuất khi publishStatus=PUBLISHED và deletedAt=null; trường địa chỉ chi tiết/liên hệ chỉ có nếu allowPublic tương ứng.
+- Mặc định `pageSize` 12; tối đa 48; response danh sách có `items`, `page`, `pageSize`, `totalItems`, `totalPages`, `hasNext`.
+- Query min/max phải hợp lệ; min lớn hơn max trả 400 với mã lỗi ổn định; escape ký tự regex và chuẩn hóa filter trước khi truy vấn MongoDB để tránh injection/ReDoS.
+- API public chỉ trả `id`, `title`, `roomType`, `priceVnd`, `areaM2`, `ward`, `district`, `city`, `publicAddress`, `amenities`, `availability`, `publishedAt`, `updatedAt` và media URLs.
+- Chi tiết public chỉ truy xuất khi `publishStatus=PUBLISHED` và `deletedAt=null`; trường địa chỉ chi tiết và từng kênh liên hệ (`phone`, `zalo`) chỉ xuất hiện khi cờ công khai tương ứng được bật.
 - Lỗi dùng envelope thống nhất: code, message tiếng Việt an toàn, requestId; lỗi nội bộ không để lộ stack trace.
 - Các hành động ghi nên có updatedAt/version hoặc ETag để phát hiện ghi đè đồng thời; xung đột trả 409 và yêu cầu tải lại.
 
