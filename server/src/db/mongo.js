@@ -1,3 +1,4 @@
+const dns = require("node:dns");
 const { MongoClient } = require("mongodb");
 const { env } = require("../config/env");
 
@@ -20,6 +21,9 @@ async function connectDb() {
   if (client) return client;
   if (!connectPromise) {
     const isAtlas = env.MONGODB_URI.startsWith("mongodb+srv://");
+    if (isAtlas && dns.getServers().every((server) => server === "127.0.0.1" || server === "::1")) {
+      dns.setServers(["8.8.8.8", "1.1.1.1"]);
+    }
     const timeoutMs = isAtlas ? 8000 : 3000;
     const nextClient = new MongoClient(env.MONGODB_URI, {
       maxPoolSize: 10,
