@@ -9,7 +9,6 @@ const DEFAULT_AMENITIES = [
   'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
   'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',
 ]
-const QUICK_AMENITIES = ['Máy lạnh', 'Thang máy', 'Ban công', 'Gác lửng', 'Bếp riêng', 'Chỗ để xe']
 
 const defaultPublicFilters = {
   q: '',
@@ -27,16 +26,6 @@ const defaultPublicFilters = {
 function formatPriceVnd(value) {
   if (value === null || value === undefined || value === '') return 'Liên hệ'
   return `${Number(value).toLocaleString('vi-VN')} ₫`
-}
-
-function formatDateVn(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'Asia/Ho_Chi_Minh',
-  })
 }
 
 function buildZaloHref(raw) {
@@ -274,7 +263,6 @@ function PublicLayout({ navigate, active = 'rooms', children }) {
           <span>
             <strong>{branding.name}</strong> · {branding.cityLabel}
           </span>
-          <span>Thông tin phòng trọ do chủ dự án trực tiếp quản lý · Không cần tài khoản để xem phòng</span>
         </div>
       </footer>
     </div>
@@ -381,12 +369,6 @@ function PublicCatalogPage({ location, navigate }) {
     commitFilters(next, 1)
   }
 
-  const setQuickArea = (minAreaM2, maxAreaM2) => {
-    const next = { ...draft, minAreaM2, maxAreaM2 }
-    setDraft(next)
-    commitFilters(next, 1)
-  }
-
   const toggleAmenity = (amenity, commitNow = false) => {
     const current = Array.isArray(draft.amenities) ? draft.amenities : []
     const exists = current.includes(amenity)
@@ -419,9 +401,6 @@ function PublicCatalogPage({ location, navigate }) {
 
   const isPricePreset = (min, max) =>
     urlState.filters.minPriceVnd === min && urlState.filters.maxPriceVnd === max
-
-  const isAreaPreset = (min, max) =>
-    urlState.filters.minAreaM2 === min && urlState.filters.maxAreaM2 === max
 
   const activeChips = []
   if (urlState.filters.q) activeChips.push({ key: 'q', label: `Từ khóa: "${urlState.filters.q}"` })
@@ -470,59 +449,8 @@ function PublicCatalogPage({ location, navigate }) {
       <section className="public-hero-band">
         <div className="public-container public-hero-grid">
           <div className="public-hero-copy">
-            <span className="eyebrow">
-              <span className="eyebrow-dot" /> QUẬN BÌNH THẠNH · TP. HỒ CHÍ MINH
-            </span>
-            <h1>
-              Tìm phòng trọ thoáng sáng, <em>minh bạch</em> từng thông tin.
-            </h1>
-            <p>
-              Xem nhanh ảnh thực tế, giá thuê theo tháng, diện tích và tình trạng phòng còn trống tại khu vực Bình Thạnh. Không cần đăng nhập, liên hệ trực tiếp chủ nhà.
-            </p>
-            <div className="hero-highlights">
-              <span className="hero-highlight-item">
-                <Icon name="check" size={16} /> Cập nhật trực tiếp từ chủ phòng
-              </span>
-              <span className="hero-highlight-item">
-                <Icon name="shield" size={16} /> Minh bạch giá &amp; tình trạng
-              </span>
-              <span className="hero-highlight-item">
-                <Icon name="phone" size={16} /> Gọi điện / Zalo nhanh chóng
-              </span>
-            </div>
+            <h1>Tìm phòng trọ Quận Bình Thạnh</h1>
           </div>
-
-          <aside className="hero-feature-card" aria-label="Điểm nổi bật">
-            <div className="hero-feature-top">
-              <span className="eyebrow">TIÊU CHUẨN TIN PHÒNG</span>
-              <span className="hero-feature-badge">
-                <Icon name="sparkles" size={14} /> Đã kiểm duyệt
-              </span>
-            </div>
-            <ul className="hero-feature-list">
-              <li>
-                <span className="hero-feature-icon"><Icon name="image" size={18} /></span>
-                <div>
-                  <strong>Hình ảnh &amp; thông số thật</strong>
-                  <small>Mỗi tin hiển thị diện tích m², loại phòng và tiện nghi có sẵn.</small>
-                </div>
-              </li>
-              <li>
-                <span className="hero-feature-icon"><Icon name="location" size={18} /></span>
-                <div>
-                  <strong>Định vị khu vực thuận tiện</strong>
-                  <small>Dễ dàng lọc theo phường, tuyến đường gần nơi học tập và làm việc.</small>
-                </div>
-              </li>
-              <li>
-                <span className="hero-feature-icon"><Icon name="clock" size={18} /></span>
-                <div>
-                  <strong>Phòng còn trống ưu tiên trước</strong>
-                  <small>Tình trạng Còn trống / Đã thuê luôn được hiển thị rõ ràng.</small>
-                </div>
-              </li>
-            </ul>
-          </aside>
         </div>
       </section>
 
@@ -649,24 +577,6 @@ function PublicCatalogPage({ location, navigate }) {
                     Trên 5 triệu
                   </button>
                 </div>
-
-                <div className="quick-price-chips" role="group" aria-label="Chọn nhanh tiện nghi nổi bật">
-                  <span className="quick-chip-label">Tiện nghi nổi bật:</span>
-                  {QUICK_AMENITIES.filter((item) => categories.amenities.includes(item)).map((amenity) => {
-                    const active = (urlState.filters.amenities || []).includes(amenity)
-                    return (
-                      <button
-                        type="button"
-                        key={amenity}
-                        className={`filter-chip${active ? ' is-active' : ''}`}
-                        aria-pressed={active}
-                        onClick={() => toggleAmenity(amenity, true)}
-                      >
-                        {amenity}
-                      </button>
-                    )
-                  })}
-                </div>
               </div>
 
               {activeFilterCount > 0 && (
@@ -746,41 +656,7 @@ function PublicCatalogPage({ location, navigate }) {
                 </div>
 
                 <div className="advanced-subblock">
-                  <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng diện tích">
-                    <span className="quick-chip-label">Diện tích nhanh:</span>
-                    <button
-                      type="button"
-                      className={`filter-chip${isAreaPreset('', '') ? ' is-active' : ''}`}
-                      onClick={() => setQuickArea('', '')}
-                    >
-                      Tất cả
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-chip${isAreaPreset('', '20') ? ' is-active' : ''}`}
-                      onClick={() => setQuickArea('', '20')}
-                    >
-                      Dưới 20 m²
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-chip${isAreaPreset('20', '30') ? ' is-active' : ''}`}
-                      onClick={() => setQuickArea('20', '30')}
-                    >
-                      20 – 30 m²
-                    </button>
-                    <button
-                      type="button"
-                      className={`filter-chip${isAreaPreset('30', '') ? ' is-active' : ''}`}
-                      onClick={() => setQuickArea('30', '')}
-                    >
-                      Trên 30 m²
-                    </button>
-                  </div>
-                </div>
-
-                <div className="advanced-subblock">
-                  <span className="quick-chip-label">Tất cả tiện nghi phòng (chọn nhiều):</span>
+                  <span className="quick-chip-label">Tiện nghi:</span>
                   <div className="amenity-filter-grid" role="group" aria-label="Lọc theo tiện nghi phòng">
                     {categories.amenities.map((amenity) => {
                       const active = (draft.amenities || []).includes(amenity)
@@ -941,13 +817,8 @@ function PublicCatalogPage({ location, navigate }) {
               <strong>
                 {activeFilterCount > 0
                   ? 'Không tìm thấy phòng phù hợp tiêu chí của bạn'
-                  : 'Danh sách phòng đang được chủ nhà cập nhật'}
+                  : 'Chưa có phòng nào'}
               </strong>
-              <p>
-                {activeFilterCount > 0
-                  ? 'Bạn thử mở rộng mức giá, thay đổi khu vực hoặc xóa bớt bộ lọc để xem thêm lựa chọn.'
-                  : 'Hiện chưa có tin phòng nào được đăng công khai. Vui lòng quay lại sau hoặc thử tải lại trang.'}
-              </p>
               {activeFilterCount > 0 ? (
                 <button type="button" className="button button-primary" onClick={resetAllFilters}>
                   Xóa toàn bộ bộ lọc
@@ -1023,7 +894,6 @@ function PublicRoomCard({ room, navigate, priority = false }) {
         )}
 
         <div className="card-footer">
-          <span className="card-updated">Cập nhật {formatDateVn(room.updatedAt)}</span>
           <AppLink to={detailPath} navigate={navigate} className="card-detail-cta">
             Xem chi tiết <Icon name="arrow" size={15} />
           </AppLink>
@@ -1376,11 +1246,6 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
             <button type="button" className="back-link" onClick={goBackToList} style={{ margin: 0 }}>
               <Icon name="chevron" size={16} /> Quay lại danh sách phòng
             </button>
-            {item && (
-              <span className="card-updated">
-                Cập nhật lần cuối: {formatDateVn(item.updatedAt)}
-              </span>
-            )}
           </div>
 
           {error ? (
@@ -1455,14 +1320,7 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
                   </li>
                   <li>
                     <Icon name="location" size={18} />
-                    <span>
-                      Vị trí: <strong>{item.displayAddress}</strong>
-                      {!item.exactAddress && ' (khu vực tham khảo, liên hệ để xem nhà cụ thể)'}
-                    </span>
-                  </li>
-                  <li>
-                    <Icon name="calendar" size={18} />
-                    <span>Cập nhật: <strong>{formatDateVn(item.updatedAt)}</strong></span>
+                    <span>Vị trí: <strong>{item.displayAddress}</strong></span>
                   </li>
                 </ul>
 
@@ -1487,13 +1345,6 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
                       Chưa có kênh liên hệ công khai cho tin phòng này.
                     </div>
                   )}
-                </div>
-
-                <div className="detail-trust-note">
-                  <Icon name="shield" size={17} />
-                  <span>
-                    Tin được cập nhật trực tiếp trên hệ thống quản lý phòng trọ Bình Thạnh. Vui lòng kiểm tra trực tiếp phòng và thỏa thuận rõ ràng khi xem nhà.
-                  </span>
                 </div>
               </aside>
             </div>

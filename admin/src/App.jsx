@@ -447,18 +447,13 @@ function LoginPage({ onLogin, notice, clearNotice }) {
     <main className="login-page">
       <header className="login-top">
         <Brand />
-        <span className="secure-note">
-          <Icon name="shield" size={16} /> Khu vực riêng tư
-        </span>
       </header>
 
       <section className="login-card">
         <div className="login-icon">
           <Icon name="homeSmall" size={24} />
         </div>
-        <span className="eyebrow">CHÀO MỪNG BẠN TRỞ LẠI</span>
         <h1>Đăng nhập quản trị</h1>
-        <p className="login-copy">Đăng nhập để quản lý tin phòng, hình ảnh và trạng thái còn trống.</p>
 
         {notice && <div className="inline-notice" role="status" style={{ marginBottom: 16 }}>{notice.text}</div>}
         {error && (
@@ -516,17 +511,12 @@ function LoginPage({ onLogin, notice, clearNotice }) {
           </button>
         </form>
 
-        <div className="login-footnote">
-          <Icon name="shield" size={16} />
-          <span>Phiên đăng nhập được bảo vệ bằng cookie an toàn và tự hết hạn sau 30 phút không hoạt động.</span>
-        </div>
       </section>
 
       <footer className="login-footer">
         <a href={branding.publicSiteUrl} target="_blank" rel="noopener noreferrer" className="text-button">
           ← Mở trang khách xem phòng
         </a>
-        <span>{branding.name.toLocaleUpperCase('vi-VN')} · QUẢN TRỊ NỘI BỘ</span>
       </footer>
     </main>
   )
@@ -560,19 +550,12 @@ function ChangePasswordPage({ onComplete, onLogout }) {
     <main className="login-page">
       <header className="login-top">
         <Brand />
-        <span className="secure-note">
-          <Icon name="shield" size={16} /> Thiết lập bảo mật lần đầu
-        </span>
       </header>
       <section className="login-card change-card">
         <div className="login-icon">
           <Icon name="shield" size={24} />
         </div>
-        <span className="eyebrow">BẢO VỆ TÀI KHOẢN CỦA BẠN</span>
         <h1>Tạo mật khẩu riêng</h1>
-        <p className="login-copy">
-          Mật khẩu khởi tạo chỉ dùng một lần. Hãy đổi sang mật khẩu riêng trước khi quản lý tin phòng.
-        </p>
         {error && <div className="form-alert" role="alert" style={{ marginBottom: 16 }}>{error}</div>}
         <form onSubmit={submit} className="login-form">
           <label className="field">
@@ -586,7 +569,6 @@ function ChangePasswordPage({ onComplete, onLogout }) {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <small className="field-hint">Dùng ít nhất 12 ký tự để bảo vệ tài khoản.</small>
           </label>
           <label className="field">
             <span>Nhập lại mật khẩu</span>
@@ -637,7 +619,6 @@ function AdminLayout({ admin, active, path, navigate, onLogout, children }) {
           </button>
         </div>
 
-        <div className="workspace-label">KHÔNG GIAN CỦA BẠN</div>
         <nav className="side-nav" aria-label="Điều hướng quản trị">
           {navItems.map((item) => (
             <AppLink
@@ -664,16 +645,10 @@ function AdminLayout({ admin, active, path, navigate, onLogout, children }) {
           >
             <Icon name="external" size={15} /> Xem trang khách
           </a>
-          <div className="help-card">
-            <span className="help-icon"><Icon name="shield" size={16} /></span>
-            <strong>Không gian riêng tư</strong>
-            <p>Chỉ bạn có thể tạo, sửa, ẩn hoặc xuất bản các tin phòng.</p>
-          </div>
           <button className="profile-button" onClick={() => setLogoutOpen(true)}>
             <span className="avatar">{admin.displayName.slice(0, 1).toUpperCase()}</span>
             <span className="profile-copy">
               <strong>{admin.displayName}</strong>
-              <small>Quản trị viên</small>
             </span>
             <Icon name="logout" size={17} />
           </button>
@@ -686,14 +661,9 @@ function AdminLayout({ admin, active, path, navigate, onLogout, children }) {
             <Icon name="menu" />
           </button>
           <div className="breadcrumb">
-            <span>Quản trị</span>
-            <Icon name="chevron" size={14} />
             <strong>{title}</strong>
           </div>
           <div className="topbar-right">
-            <span className="topbar-location">
-              <span className="location-dot" /> Bình Thạnh, TP.HCM
-            </span>
             <button className="user-pill" onClick={() => setLogoutOpen(true)}>
               <span className="avatar avatar-small">{admin.displayName.slice(0, 1).toUpperCase()}</span>
               <span>{admin.displayName}</span>
@@ -719,7 +689,7 @@ function AdminLayout({ admin, active, path, navigate, onLogout, children }) {
   )
 }
 
-function PageHeading({ eyebrow, title, description, action, back }) {
+function PageHeading({ title, action, back }) {
   return (
     <div className={`page-heading${back ? ' has-back' : ''}`}>
       <div>
@@ -729,9 +699,7 @@ function PageHeading({ eyebrow, title, description, action, back }) {
           </button>
         )}
         <div>
-          <span className="eyebrow">{eyebrow}</span>
           <h1>{title}</h1>
-          {description && <p>{description}</p>}
         </div>
       </div>
       {action && <div className="heading-action">{action}</div>}
@@ -801,7 +769,6 @@ function DashboardPage({ navigate }) {
               <span className="stat-icon"><Icon name={card.icon} /></span>
             </div>
             <strong className="stat-number">{data ? card.value : <span className="skeleton-line" />}</strong>
-            <small>{card.detail}</small>
           </article>
         ))}
       </section>
@@ -810,7 +777,6 @@ function DashboardPage({ navigate }) {
         <div className="panel recent-panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">CẬP NHẬT GẦN ĐÂY</span>
               <h2>Tin phòng mới chỉnh sửa</h2>
             </div>
             <AppLink to="/rooms" navigate={navigate} className="text-link">
@@ -823,26 +789,12 @@ function DashboardPage({ navigate }) {
             <div className="empty-state compact-empty">
               <span className="empty-illustration"><Icon name="rooms" size={28} /></span>
               <strong>Chưa có tin phòng nào</strong>
-              <p>Tạo tin đầu tiên để bắt đầu xây dựng danh sách phòng trọ của bạn.</p>
               <button className="button button-secondary" onClick={() => navigate('/rooms/new')}>
                 <Icon name="plus" size={16} /> Tạo tin đầu tiên
               </button>
             </div>
           )}
         </div>
-
-        <aside className="tip-card">
-          <span className="tip-spark"><Icon name="sparkles" size={28} /></span>
-          <span className="eyebrow">MẸO NHỎ</span>
-          <h2>Ảnh đẹp giúp khách dễ hình dung căn phòng.</h2>
-          <p>
-            Hãy chụp phòng vào ban ngày có ánh sáng tự nhiên, giữ phòng gọn gàng và chọn góc rộng nhất làm ảnh bìa ngay trong phần chỉnh sửa tin.
-          </p>
-          <div className="tip-rule" />
-          <span className="tip-note">
-            <Icon name="image" size={16} /> Tối đa 15 ảnh · JPEG, PNG hoặc WebP
-          </span>
-        </aside>
       </section>
     </div>
   )
@@ -1019,7 +971,6 @@ function RoomListPage({ navigate, showNotice }) {
 
         <div className="list-meta">
           <span>{busy ? 'Đang tải danh sách…' : `${result?.totalItems || 0} tin phòng`}</span>
-          <span>Trạng thái tin và tình trạng phòng được quản lý riêng biệt</span>
         </div>
 
         {busy ? (
@@ -1040,11 +991,6 @@ function RoomListPage({ navigate, showNotice }) {
                 ? 'Không tìm thấy tin phù hợp'
                 : 'Chưa có tin phòng nào'}
             </strong>
-            <p>
-              {applied.q || applied.publishStatus || applied.availability
-                ? 'Thử thay đổi bộ lọc hoặc xóa các điều kiện tìm kiếm.'
-                : 'Tạo tin đầu tiên để giới thiệu phòng trọ của bạn.'}
-            </p>
             <button
               className="button button-secondary"
               onClick={() => (
@@ -1733,7 +1679,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">01</span>
               <div>
                 <h2>Thông tin phòng</h2>
-                <p>Giúp khách hình dung rõ không gian cho thuê.</p>
               </div>
             </div>
             <div className="field-grid">
@@ -1746,7 +1691,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="Ví dụ: Phòng có gác, cửa sổ thoáng gần Hàng Xanh, Bình Thạnh"
                 />
                 {fieldError('title')}
-                <small className="field-hint">10–120 ký tự để xuất bản · {form.title.length}/120</small>
               </label>
 
               <label className="field field-span-2" id="field-description">
@@ -1759,7 +1703,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="Mô tả không gian, ánh sáng, lối đi, giờ giấc và các lưu ý cho khách thuê…"
                 />
                 {fieldError('description')}
-                <small className="field-hint">Tối thiểu 30 ký tự để xuất bản · {form.description.length}/5000</small>
               </label>
 
               <label className="field" id="field-roomType">
@@ -1780,7 +1723,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   <option value="RENTED">Đã thuê</option>
                 </select>
                 {fieldError('availability')}
-                <small className="field-hint">Độc lập với trạng thái hiển thị của tin.</small>
               </label>
             </div>
           </section>
@@ -1790,7 +1732,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">02</span>
               <div>
                 <h2>Giá và diện tích</h2>
-                <p>Thông tin khách thường muốn xem đầu tiên.</p>
               </div>
             </div>
             <div className="field-grid">
@@ -1833,7 +1774,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">03</span>
               <div>
                 <h2>Địa chỉ và khu vực</h2>
-                <p>Địa chỉ đầy đủ được giữ riêng tư theo mặc định.</p>
               </div>
             </div>
             <div className="field-grid">
@@ -1867,9 +1807,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               </label>
 
               <label className="field field-span-2" id="field-privateAddress">
-                <span>
-                  Địa chỉ đầy đủ <small className="optional">chỉ lưu nội bộ trừ khi bạn bật công khai</small>
-                </span>
+                <span>Địa chỉ đầy đủ</span>
                 <input
                   value={form.privateAddress}
                   onChange={(e) => update('privateAddress', e.target.value)}
@@ -1893,7 +1831,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">04</span>
               <div>
                 <h2>Nội thất và tiện nghi</h2>
-                <p>Chọn những tiện nghi có sẵn trong phòng.</p>
               </div>
             </div>
             <div className="amenities-grid">
@@ -1919,7 +1856,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">05</span>
               <div>
                 <h2>Hình ảnh phòng</h2>
-                <p>Ảnh rõ, chân thực giúp khách dễ quyết định hơn. Chọn ảnh làm ảnh bìa ngay trước khi lưu.</p>
               </div>
               <span className="section-counter">{images.length} / 15</span>
             </div>
@@ -1947,7 +1883,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               />
               <span className="upload-icon"><Icon name="upload" size={21} /></span>
               <strong>{uploading || (images.length >= 15 ? 'Đã đạt giới hạn 15 ảnh' : 'Chọn hoặc kéo thả ảnh từ thiết bị')}</strong>
-              <small>Hỗ trợ JPEG, PNG hoặc WebP · tối đa 10 MB mỗi ảnh ({images.length}/15)</small>
               <span className="button button-secondary button-small">Chọn hình ảnh</span>
             </label>
 
@@ -2024,7 +1959,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               <span className="section-number">06</span>
               <div>
                 <h2>Thông tin liên hệ</h2>
-                <p>Bạn chọn rõ kênh nào khách có thể nhìn thấy khi tin được xuất bản.</p>
               </div>
             </div>
             <div className="field-grid">
@@ -2105,16 +2039,8 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
 
         <aside className="form-side-column">
           <div className="panel publish-panel">
-            <span className="eyebrow">TRẠNG THÁI TIN</span>
             <div className="publish-status-head">
               <StatusBadge status={publishStatus} />
-              <span>
-                {publishStatus === 'PUBLISHED'
-                  ? 'Khách có thể xem tin này trên trang công khai.'
-                  : publishStatus === 'HIDDEN'
-                    ? 'Tin hiện đang được ẩn khỏi khách.'
-                    : 'Chỉ bạn xem được bản nháp này.'}
-              </span>
             </div>
             {roomId && (
               <button
@@ -2135,16 +2061,6 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                 Chuyển về bản nháp
               </button>
             )}
-            <div className="publish-divider" />
-            <p className="publish-tip">
-              <Icon name="shield" size={16} /> Chỉ xuất bản khi thông tin, ảnh và ít nhất một kênh liên hệ đã đầy đủ.
-            </p>
-          </div>
-
-          <div className="form-tip-card">
-            <span className="tip-icon"><Icon name="location" size={18} /></span>
-            <strong>Địa chỉ luôn riêng tư theo mặc định</strong>
-            <p>Chỉ khu vực/phường được chia sẻ. Bạn có thể cho phép hiển thị địa chỉ đầy đủ riêng cho từng tin.</p>
           </div>
 
           {roomId && (
@@ -2268,7 +2184,6 @@ function RoomPreviewPage({ roomId, navigate }) {
     <div className="preview-admin">
       <div className="preview-banner">
         <span><Icon name="eye" size={18} /> BẢN XEM TRƯỚC RIÊNG TƯ</span>
-        <span>Chỉ bạn có thể xem đường dẫn này trước khi xuất bản</span>
         <button className="button button-secondary button-small" onClick={() => navigate(`/rooms/${roomId}`)}>
           <Icon name="edit" size={15} /> Quay lại chỉnh sửa
         </button>
@@ -2409,7 +2324,6 @@ function ArchivedPage({ showNotice }) {
       <section className="panel listing-panel">
         <div className="list-meta">
           <span>{busy ? 'Đang tải…' : `${result?.totalItems || 0} tin đã lưu trữ`}</span>
-          <span>Tin đã lưu trữ không xuất hiện với khách</span>
         </div>
         {busy ? (
           <RoomTableSkeleton />
@@ -2435,7 +2349,6 @@ function ArchivedPage({ showNotice }) {
           <div className="empty-state">
             <span className="empty-illustration"><Icon name="archive" size={28} /></span>
             <strong>Chưa có tin nào được lưu trữ</strong>
-            <p>Các tin phòng được chuyển vào lưu trữ sẽ hiển thị an toàn tại đây.</p>
           </div>
         )}
         {result?.totalPages > 1 && (
