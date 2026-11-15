@@ -9,6 +9,8 @@
     "start": "node src/server.js",
     "db:init": "node scripts/init-db.js",
     "db:migrate": "node scripts/init-db.js",
+    "db:seed:sprint2": "node scripts/seed-sprint2.js",
+    "verify:sprint2": "node scripts/verify-sprint2-public.js",
     "admin:provision": "node scripts/provision-admin.js"
   },
   "keywords": [],

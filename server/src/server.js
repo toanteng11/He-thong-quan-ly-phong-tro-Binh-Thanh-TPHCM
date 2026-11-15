@@ -16,16 +16,26 @@ app.use(requestId);
 app.use(express.json({ limit: "1mb" }));
 app.use((request, response, next) => {
   const origin = request.get("Origin");
-  if (origin && origin === env.CLIENT_ORIGIN) {
+  const isAdminRoute = request.path.startsWith("/api/v1/admin");
+  const allowedOrigin = isAdminRoute
+    ? origin === env.ADMIN_ORIGIN
+    : origin === env.CLIENT_ORIGIN || origin === env.ADMIN_ORIGIN;
+
+  if (origin && allowedOrigin) {
     response.setHeader("Access-Control-Allow-Origin", origin);
     response.setHeader("Vary", "Origin");
-    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    response.setHeader(
+      "Access-Control-Allow-Methods",
+      isAdminRoute ? "GET, POST, PUT, PATCH, DELETE, OPTIONS" : "GET, OPTIONS",
+    );
     response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    response.setHeader("Access-Control-Allow-Credentials", "true");
+    if (isAdminRoute) {
+      response.setHeader("Access-Control-Allow-Credentials", "true");
+    }
   }
 
   if (request.method === "OPTIONS") {
-    return response.sendStatus(origin === env.CLIENT_ORIGIN ? 204 : 403);
+    return response.sendStatus(allowedOrigin ? 204 : 403);
   }
   return next();
 });
