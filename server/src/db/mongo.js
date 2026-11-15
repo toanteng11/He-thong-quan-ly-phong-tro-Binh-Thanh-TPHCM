@@ -19,10 +19,12 @@ function resolveDbName() {
 async function connectDb() {
   if (client) return client;
   if (!connectPromise) {
+    const isAtlas = env.MONGODB_URI.startsWith("mongodb+srv://");
+    const timeoutMs = isAtlas ? 8000 : 3000;
     const nextClient = new MongoClient(env.MONGODB_URI, {
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 3000,
-      connectTimeoutMS: 3000,
+      serverSelectionTimeoutMS: timeoutMs,
+      connectTimeoutMS: timeoutMs,
     });
     nextClient.on("error", (error) => {
       console.error(JSON.stringify({

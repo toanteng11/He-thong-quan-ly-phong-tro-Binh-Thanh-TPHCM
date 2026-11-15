@@ -1,3 +1,9 @@
+const API_ORIGIN = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+
+export function resolveApiUrl(path) {
+  return `${API_ORIGIN}/api/v1${path}`
+}
+
 export class ApiError extends Error {
   constructor(status, payload) {
     super(payload?.error?.message || 'Không thể hoàn thành yêu cầu.')
@@ -13,10 +19,10 @@ export async function api(path, options = {}) {
   const headers = new Headers(rest.headers || {})
   if (json !== undefined) headers.set('Content-Type', 'application/json')
   headers.set('Accept', 'application/json')
-  const response = await fetch(`/api/v1${path}`, {
+  const response = await fetch(resolveApiUrl(path), {
     ...rest,
     headers,
-    credentials: 'same-origin',
+    credentials: API_ORIGIN ? 'include' : 'same-origin',
     cache: 'no-store',
     body: json === undefined ? rest.body : JSON.stringify(json),
   })

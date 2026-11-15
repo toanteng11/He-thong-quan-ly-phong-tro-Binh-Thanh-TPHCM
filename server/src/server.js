@@ -11,7 +11,13 @@ const { healthRouter } = require("./routes/health");
 const app = express();
 
 app.disable("x-powered-by");
-app.use(helmet());
+if (env.TRUST_PROXY !== 0 && env.TRUST_PROXY !== false) {
+  app.set("trust proxy", env.TRUST_PROXY);
+}
+app.use(helmet({
+  hsts: env.COOKIE_SECURE_EFFECTIVE ? { maxAge: 15552000, includeSubDomains: true } : false,
+  frameguard: { action: "deny" },
+}));
 app.use(requestId);
 app.use(express.json({ limit: "1mb" }));
 app.use((request, response, next) => {

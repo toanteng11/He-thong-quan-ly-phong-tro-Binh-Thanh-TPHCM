@@ -65,10 +65,11 @@ Môi trường đề xuất: local/dev để phát triển; staging để kiểm
 
 | Nội dung | Quyết định/việc cần làm |
 |---|---|
-| Cơ sở dữ liệu | MongoDB 8 (driver chính thức `mongodb`) đã được chọn thay thế PostgreSQL theo `ADR-S0-01`; cần chốt dịch vụ production (Atlas hoặc self-managed riêng tư). |
-| Lưu ảnh | Dùng object storage hoặc dịch vụ tương đương; giới hạn ảnh đã được chốt tại Data Analysis. |
-| Đăng nhập | Dùng session cookie an toàn; chi tiết timeout/CSRF/rate limit phải ghi trong ADR/API trước khi triển khai. |
-| Sao lưu | Baseline hàng ngày, 7 daily + 4 weekly, RPO ≤24h/RTO ≤1 ngày làm việc; chủ dự án duyệt provider/chi phí. |
+| Cơ sở dữ liệu | MongoDB 8 (driver chính thức `mongodb`) đã được chọn thay thế PostgreSQL theo `ADR-S0-01`; đã chốt triển khai Production miễn phí trên **MongoDB Atlas M0 Sandbox Free (512 MB, Singapore)**. |
+| Lưu ảnh | Đã chốt lưu qua tầng trừu tượng `imageStorage` lên **Cloudinary (Free 25 credits/tháng, không cần thẻ)** nhằm tránh mất file khi Render Free restart. |
+| Đăng nhập | Dùng session cookie `HttpOnly` + `Secure`; hỗ trợ `SameSite=Lax` (khi rewrite qua Vercel) hoặc `SameSite=None` kèm kiểm tra origin tuyệt đối (`ADMIN_ORIGIN`) & rate-limit theo `TRUST_PROXY`. |
+| Hosting & Giám sát | Đã chốt **Vercel (Free Hobby)** cho `client/` & `admin/`, **Render.com (Free Web Service)** cho Backend API, kết hợp **UptimeRobot (Free 5 phút/lần)** để chống ngủ (anti-sleep) và cảnh báo Email (`0đ/tháng`). |
+| Sao lưu | Baseline hàng ngày, 7 daily + 4 weekly, RPO ≤24h/RTO ≤1 ngày làm việc; lưu offsite tách biệt với DB chính. |
 | Mở rộng địa bàn | Bảo đảm mô hình địa chỉ không chỉ có một chuỗi cố định “Bình Thạnh”. |
 
 ## 10. Ranh giới tin cậy và luồng dữ liệu
@@ -145,12 +146,12 @@ Không sao chép dữ liệu thật sang staging nếu không cần. Thay đổi
 
 | Mã | Quyết định | Khuyến nghị hiện tại | Trạng thái |
 |---|---|---|---|
-| ADR-01 | Phong cách backend | Modular monolith cho MVP | Đề xuất |
-| ADR-02 | Cơ sở dữ liệu | MongoDB 8 + driver `mongodb` (thay cho PostgreSQL 18 theo cập nhật `ADR-S0-01`); còn cần chốt provider production | Đã chọn local; chờ chốt production |
-| ADR-03 | Ảnh | Object storage hoặc dịch vụ ảnh quản lý được; không lưu file ảnh lớn trực tiếp trong trường tin | Cần chốt |
-| ADR-04 | Đăng nhập | Phiên admin an toàn; không có tự đăng ký | Cần chốt cách triển khai |
-| ADR-05 | Public rendering/SEO | Bảo đảm trang chi tiết có nội dung và metadata dễ được tìm thấy; chọn SSR/SSG hoặc phương án tương đương theo stack | Cần chốt |
-| ADR-06 | Khôi phục | Dùng baseline hàng ngày, 7 daily + 4 weekly, RPO ≤24h/RTO ≤1 ngày làm việc; xác nhận provider/chi phí | Xác nhận vận hành |
+| ADR-01 | Phong cách backend & Hosting | Modular monolith Node.js 24 + Express 5 (**Render Free**); 2 SPA React 19 + Vite (**Vercel Free**) | Đã chốt (`0đ/tháng`) |
+| ADR-02 | Cơ sở dữ liệu | MongoDB 8 + driver `mongodb` (`ADR-S0-01`), deploy trên **MongoDB Atlas M0 Sandbox Free (512 MB)** | Đã chốt (`0đ/tháng`) |
+| ADR-03 | Ảnh | **Cloudinary (Free Tier — không cần thẻ)** qua lớp `image-storage.js`; không lưu file ảnh lớn trực tiếp trong trường tin | Đã chốt (`0đ/tháng`) |
+| ADR-04 | Đăng nhập | Phiên admin SHA-256 hash (`HttpOnly; Secure`), `TRUST_PROXY=1`, CORS & Origin guard, không có tự đăng ký | Đã chốt |
+| ADR-05 | Public rendering/Domain | SPA trên Vercel HTTPS sẵn (`*.vercel.app`) hoặc gắn tên miền riêng qua Cloudflare DNS Free | Đã chốt (`0đ/tháng`) |
+| ADR-06 | Khôi phục & Giám sát | Dùng baseline hàng ngày, 7 daily + 4 weekly, RPO ≤24h/RTO ≤1 ngày làm việc; **UptimeRobot Free (5 phút/lần)** giữ backend thức & cảnh báo Email | Đã chốt (`0đ/tháng`) |
 
 ## 16. Điều kiện sẵn sàng cho triển khai
 

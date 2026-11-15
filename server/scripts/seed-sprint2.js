@@ -11,6 +11,10 @@ const { imageStorage } = require("../src/storage/image-storage");
 const SEED_TAG = "SPRINT_2_SAMPLE";
 const UPLOADS_ROOT = path.resolve(__dirname, "../uploads");
 
+if (process.env.NODE_ENV === "production" || /prod/i.test(process.env.MONGODB_DB_NAME || "")) {
+  throw new Error("Refusing to run demo seed script against a production database or NODE_ENV=production!");
+}
+
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let n = 0; n < 256; n += 1) {

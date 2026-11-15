@@ -9,8 +9,8 @@
 | **Mục tiêu chính** | Đóng băng và kiểm chứng toàn diện ma trận nghiệm thu `AT-01`–`AT-49` (tài liệu `10_Testing_Acceptance.md`), thiết lập kiến trúc tách biệt môi trường `Staging` và `Production`, cấu hình tên miền/HTTPS/TLS và bảo mật cookie/CORS/headers (`NFR-04`, `NFR-09`, `NFR-14`), xây dựng cơ chế sao lưu tự động **MongoDB 8 + Kho ảnh** theo chuẩn **7 bản ngày + 4 bản tuần** kèm diễn tập khôi phục thực tế đạt `RPO ≤ 24 giờ` & `RTO ≤ 1 ngày làm việc` (`NFR-11`, `AT-37`, `AT-39`), thiết lập giám sát `/api/v1/health/live` & `/api/v1/health/ready` + cảnh báo sự cố (`FR-17`, `NFR-10`, `NFR-12`, `AT-36`, `AT-49`), làm sạch dữ liệu thử nghiệm và nhập dữ liệu phòng thật (chuẩn **5 phường Quận Bình Thạnh năm 2026** & danh mục tiện nghi mới có `Thang máy`) (`AT-44`), bàn giao Runbook vận hành và ký biên bản Go-Live (`UC-10`, `UC-11`, `NFR-15`, `AT-41`, `AT-47`). |
 | **Use case trọng tâm** | `UC-10` (Phát hành và xác nhận sẵn sàng production), `UC-11` (Khôi phục sau sự cố dữ liệu/dịch vụ), kết hợp kiểm thử hồi quy đầu-cuối `UC-01`–`UC-09`. |
 | **Yêu cầu liên quan** | Toàn bộ `BRQ-01`–`BRQ-06`; `FR-01`–`FR-19` (trọng tâm `FR-13`–`FR-18`); `NFR-01`–`NFR-18` (trọng tâm `NFR-04`, `NFR-08`–`NFR-16`); `RULE-01`–`RULE-13`; toàn bộ `AT-01`–`AT-49` (đặc biệt Production Acceptance Gate `AT-30`–`AT-49`); `ADR-01`–`ADR-08`. |
-| **Kiến trúc ứng dụng & dữ liệu** | Hai cổng frontend độc lập `client/` (Public Web) & `admin/` (Admin Web) + Backend Express 5 (`server/`) + **MongoDB 8** (driver chính thức `mongodb`, mảng `images[]` nhúng nguyên tử trong `room_listings`) + Kho lưu trữ ảnh tách biệt theo môi trường (`UPLOAD_DIR` / Object Storage). |
-| **Trạng thái Sprint 4** | **Sẵn sàng triển khai (Planning Baseline đã khóa)**. |
+| **Kiến trúc ứng dụng & dữ liệu** | Hai cổng frontend độc lập `client/` (Public Web) & `admin/` (Admin Web) + Backend Express 5 (`server/`) + **MongoDB 8** (driver chính thức `mongodb`, mảng `images[]` nhúng nguyên tử trong `room_listings`) + Kho lưu trữ ảnh đa driver `local` / **Cloudinary Free** (`IMAGE_STORAGE_DRIVER`). |
+| **Trạng thái Sprint 4** | **Đã hoàn thành mã nguồn & kiểm chứng tự động local (`S4-01`–`S4-08`, `verify:sprint4` PASS)** — Sẵn sàng cấu hình tài khoản Cloud 0đ & Go-Live thực tế (`S4-09`–`S4-10`). |
 
 ### 1.1. Sprint Goal
 
@@ -38,6 +38,7 @@
 | [Sprint 1 — Khu quản trị và quản lý tin phòng](<./Sprint_1_Admin_Quan_ly_Tin_Phong.md>) | Quy chuẩn xác thực `scrypt`, `admin_sessions`, rate-limit, provisioning admin, xóa mềm/khôi phục và bảo mật upload. |
 | [Sprint 2 — Hệ thống Khách hàng: Danh sách, Tìm kiếm, Lọc và Chi tiết Phòng](<./Sprint_2_Khach_Xem_Danh_Sach_Chi_Tiet.md>) | Quy chuẩn tách biệt `client/` – `admin/`, Public Allowlist JSON, bảo vệ `privateAddress` và bộ test `verify-sprint2-public.js`. |
 | [Sprint 3 — Tìm kiếm, Lọc nâng cao và Tối ưu UX/Hiệu năng](<./Sprint_3_Tim_Kiem_Loc_Nang_Cao_Toi_Uu_UX_Hieu_Nang.md>) | Benchmark 500 tin `NFR-13` (`p75 = 1352.1 ms`), tối ưu `ETag`/`304`, 5 phường 2026, tiện nghi `Thang máy` và bộ test `verify-sprint3-perf.js`. |
+| [Hướng dẫn Deploy Cloud 0đ (Production Free Tier)](<./Huong_Dan_Deploy_Cloud_0d.md>) | Hướng dẫn từng bước tạo tài khoản & cấu hình biến môi trường trên MongoDB Atlas M0, Cloudinary Free, Render Free, Vercel Free và UptimeRobot Free. |
 | [03_Requirements.md](<../Tài liệu BA/Đợt 1 - Phân tích nghiệp vụ/03_Requirements.md>) | Baseline production Mục 8 (`FR-13`–`FR-19`, `NFR-09`–`NFR-18`, điều kiện xuất bản 8.2) & `RULE-08`–`RULE-13`. |
 | [04_Use_Case.md](<../Tài liệu BA/Đợt 1 - Phân tích nghiệp vụ/04_Use_Case.md>) | Đặc tả chi tiết `UC-09` (Xóa mềm/khôi phục), `UC-10` (Phát hành production) và `UC-11` (Khôi phục sau sự cố). |
 | [05_Business_Process.md](<../Tài liệu BA/Đợt 1 - Phân tích nghiệp vụ/05_Business_Process.md>) | Quy trình go-live (Mục 8.1), smoke check phát hành (8.2), lịch vận hành (8.3) và khôi phục/rollback (8.4). |
@@ -53,14 +54,14 @@ Theo Mục 17.5 của `08_System_Architecture.md`, trước khi mở cổng phá
 
 | Mã ADR | Chủ đề | Quyết định kiến trúc Production đã khóa | Chủ sở hữu / Người duy trì |
 | :--- | :--- | :--- | :--- |
-| **`ADR-01`** | **Web / API Stack** | Frontend tách 2 SPA build tĩnh **React 19 + Vite** (`client/dist` cho khách và `admin/dist` cho chủ dự án); Backend **Node.js 24 LTS + Express 5** theo kiến trúc modular monolith; gắn phiên bản phát hành `MAJOR.MINOR.PATCH` và tag/commit Git cho mỗi release để quay lui tức thời. | Kỹ sư triển khai & Chủ dự án (`Ngọc Toàn`) |
-| **`ADR-02`** | **Database** | **MongoDB 8** (driver chính thức `mongodb`). Bắt buộc xác thực SCRAM-SHA-256 + TLS, **không mở cổng `27017` ra Internet công khai** (chỉ mở trong mạng nội bộ / IP allowlist của backend), tách hoàn toàn DB `room_rental_prod` khỏi `room_rental_staging` và `room_rental_dev`. Toàn bộ 8 index khởi tạo chuẩn qua `npm --prefix server run db:init`. | Chủ dự án đứng tên dịch vụ; Kỹ sư vận hành cấu hình |
-| **`ADR-03`** | **Image Storage** | Lưu trữ thông qua lớp trừu tượng `server/src/storage/image-storage.js`: tách khỏi web root có thể thực thi (`UPLOAD_DIR` trên volume bền vững riêng hoặc Object Storage tương thích S3/R2). Giới hạn JPEG/PNG/WebP (`≤ 10 MB/ảnh`, `≤ 15 ảnh/tin`), kiểm tra magic bytes, phát hành qua API/CDN kèm `ETag`/`Last-Modified` và `Cache-Control: public, max-age=60`. | Chủ dự án đứng tên tài khoản storage |
-| **`ADR-04`** | **Authentication & Security** | Phiên `admin_session` lưu SHA-256 hash trong `admin_sessions` (TTL `12 giờ`), cookie `HttpOnly; Secure; SameSite=Lax; Path=/api/v1/admin` trên HTTPS production. Chặn CORS chéo nguồn giữa `CLIENT_ORIGIN` và `ADMIN_ORIGIN`; rate-limit đăng nhập (`10` lần sai / `15` phút theo IP thật sau proxy); không có endpoint đăng ký công khai; admin đầu tiên tạo qua `admin:provision` với mật khẩu tạm phải đổi khi kích hoạt (`mustChangePassword: true`). | Backend API + Reverse Proxy |
-| **`ADR-05`** | **Domain / TLS & Routing** | Tên miền chính thức và tài khoản DNS thuộc **Chủ dự án (`Ngọc Toàn`)** (ví dụ `phongtrongocToan.vn` cho khách và `quanly.phongtrongocToan.vn` hoặc route tách origin cho admin). Chứng thư số TLS 1.2/1.3 tự động gia hạn (Let's Encrypt via Caddy/Nginx hoặc Cloudflare SSL Strict), ép chuyển hướng `HTTP -> HTTPS (301)`, bật HSTS (`Strict-Transport-Security`). | Chủ dự án (`Ngọc Toàn`) giữ quyền DNS/Domain |
-| **`ADR-06`** | **Monitoring, Log & Alerts** | Readiness/Liveness qua `GET /api/v1/health/live` & `GET /api/v1/health/ready` (không trả secret/URI/stack trace). Log JSON có cấu trúc kèm `requestId` và ghi `audit_events` cho mọi thao tác admin (lọc sạch password/token/cookie). Uptime monitor ngoài kiểm tra mỗi `1–5 phút`, gửi cảnh báo ngay tới Email/Zalo/Telegram của đầu mối khi web down, backup thất bại, dung lượng `> 80%` hoặc TLS còn `< 14 ngày`. | Chủ dự án là đầu mối nhận cảnh báo chính |
-| **`ADR-07`** | **Chi phí vận hành định kỳ (Cost)** | Thanh toán minh bạch theo tài khoản chủ dự án gồm 4 nhóm cố định/tháng: (1) Domain `.vn`/`.com`, (2) Compute VPS / PaaS cho Node + MongoDB, (3) Storage / Offsite Backup (`S3/R2/Object Storage`), (4) Uptime/Alert (gói free hoặc trả phí cơ bản). Chủ dự án phê duyệt bảng chi phí thực tế trước khi nhấn Go-Live. | Chủ dự án (`Ngọc Toàn`) phê duyệt & thanh toán |
-| **`ADR-08`** | **Backup, Retention & Recovery** | Backup tự động hàng ngày cả MongoDB và Kho ảnh; giữ tối thiểu **7 bản daily + 4 bản weekly** lưu tại vị trí khác failure domain với máy chủ chính. Mục tiêu **`RPO ≤ 24 giờ`**, **`RTO ≤ 1 ngày làm việc`**. Tin xóa mềm (`deletedAt`) và `audit_events` giữ tối thiểu **90 ngày** (`DAT-03`), chỉ purge có xác nhận sau khi có backup. Bắt buộc diễn tập restore thành công trước Go-Live. | Chủ dự án duyệt chính sách; Người được ủy quyền vận hành thực thi |
+| **`ADR-01`** | **Web / API Stack (Vercel + Render Free)** | Frontend tách 2 project build tĩnh **React 19 + Vite** deploy trên **Vercel (Free Hobby)** (`client/` và `admin/` độc lập); Backend **Node.js 24 LTS + Express 5** deploy trên **Render.com (Free Web Service)**; gắn phiên bản `MAJOR.MINOR.PATCH` và tag/commit Git cho mỗi release để rollback tức thời trên Vercel/Render. | Kỹ sư triển khai & Chủ dự án (`Ngọc Toàn`) |
+| **`ADR-02`** | **Database (MongoDB Atlas M0 Free)** | **MongoDB Atlas M0 Sandbox Free (512 MB, Replica Set 3 nodes, Region Singapore `ap-southeast-1`)**, dùng driver chính thức `mongodb`. Bắt buộc xác thực SCRAM-SHA-256 + TLS (`mongodb+srv://`), cấu hình IP Access List bảo vệ, tách hoàn toàn DB `room_rental_prod` khỏi `room_rental_staging` và `room_rental_dev`. Toàn bộ 8 index khởi tạo chuẩn qua `npm --prefix server run db:init`. | Chủ dự án đứng tên tài khoản Atlas; Kỹ sư cấu hình |
+| **`ADR-03`** | **Image Storage (Cloudinary Free)** | Lưu trữ qua lớp trừu tượng `server/src/storage/image-storage.js` hỗ trợ cả `local` (dev/perf) và **Cloudinary Free (`25` credits/tháng, không cần thẻ tín dụng)** khi chạy Production (`IMAGE_STORAGE_DRIVER=cloudinary`), khắc phục ổ đĩa tạm thời (ephemeral disk) của Render Free. Ảnh phòng gốc (`publicUrl` trên Cloudinary / nội bộ) chỉ được stream qua API công khai khi tin thỏa đồng thời `status === "PUBLISHED"` và `deletedAt === null`, kèm magic-bytes validation, `ETag`/`Last-Modified` và `Cache-Control: public, max-age=60`. | Chủ dự án đứng tên tài khoản Cloudinary |
+| **`ADR-04`** | **Authentication & Security** | Phiên `admin_session` lưu SHA-256 hash trong `admin_sessions` (TTL `12 giờ`), cookie `HttpOnly; Secure; Path=/api/v1/admin` trên HTTPS production (hỗ trợ `SameSite=Lax` khi proxy cùng domain qua Vercel Rewrites hoặc `SameSite=None; Secure` khi gọi chéo subdomain `*.vercel.app` ↔ `*.onrender.com`). Khóa CORS nghiêm ngặt theo `CLIENT_ORIGIN` và `ADMIN_ORIGIN`; bật `TRUST_PROXY=1` để rate-limit (`10` lần sai / `15` phút) nhận đúng IP thật sau proxy; không có đăng ký công khai; `mustChangePassword: true` cho lần đầu. | Backend API + Reverse Proxy |
+| **`ADR-05`** | **Domain / TLS & Routing** | Giai đoạn 0đ dùng miễn phí subdomain HTTPS chuẩn TLS 1.3 có sẵn của **Vercel (`*.vercel.app`)** cho `client/` & `admin/` và **Render (`*.onrender.com`)** cho API; ép chuyển hướng `HTTP -> HTTPS (301)` & bật HSTS. Khi nâng cấp tên miền riêng (`.vn`/`.com`), trỏ DNS qua **Cloudflare DNS (Free)** để có SSL/WAF/CDN miễn phí trọn đời dưới quyền sở hữu của **Chủ dự án (`Ngọc Toàn`)**. | Chủ dự án (`Ngọc Toàn`) giữ quyền Vercel/Cloudflare |
+| **`ADR-06`** | **Monitoring, Log & Alerts (UptimeRobot Free)** | Readiness/Liveness qua `GET /api/v1/health/live` & `/ready` (không trả secret/URI/stack trace). Log JSON có cấu trúc kèm `requestId` và `audit_events` (sạch password/token/cookie). Dùng **UptimeRobot (gói Free, check 5 phút/lần)** ping liên tục `/api/v1/health/live` vừa để **giữ backend Render Free luôn thức (chống cold-start sleep sau 15 phút)** vừa gửi cảnh báo Email tức thì khi dịch vụ gặp sự cố. | Chủ dự án là đầu mối nhận cảnh báo Email |
+| **`ADR-07`** | **Chi phí vận hành định kỳ (0đ/tháng)** | Áp dụng **Production Free Tier Stack (`0đ/tháng`)**: (1) Vercel Free Hobby (2 frontend), (2) Render Free Web Service (backend), (3) MongoDB Atlas M0 Free (512 MB), (4) **Cloudinary Free (`25` credits/tháng, không yêu cầu thẻ)**, (5) UptimeRobot Free (50 monitors). Phát sinh chi phí `> 0đ` chỉ xảy ra nếu sau này chủ dự án tự nguyện mua tên miền riêng (`.vn`/`.com`) hoặc nâng cấp vượt hạn mức Free Tier. | Chủ dự án (`Ngọc Toàn`) phê duyệt & sở hữu mọi tài khoản |
+| **`ADR-08`** | **Backup, Retention & Recovery** | Backup tự động hàng ngày cả MongoDB Atlas (`EJSON.gz`) và tải đồng bộ ảnh từ **Cloudinary** hoặc `UPLOAD_DIR` (qua `backup-system.js` định kỳ); giữ tối thiểu **7 bản daily + 4 bản weekly** lưu tại kho backup tách biệt với database. Mục tiêu **`RPO ≤ 24 giờ`**, **`RTO ≤ 1 ngày làm việc`**. Tin xóa mềm (`deletedAt`) và `audit_events` giữ tối thiểu **90 ngày** (`DAT-03`). Đã diễn tập restore cô lập thành công trước Go-Live. | Chủ dự án duyệt chính sách; Người vận hành thực thi |
 
 ---
 
@@ -102,23 +103,19 @@ Theo Mục 17.5 của `08_System_Architecture.md`, trước khi mở cổng phá
 
 ```mermaid
 flowchart TD
-    Visitor["Khách thuê phòng (Mobile 360px / Desktop)"] -->|"HTTPS (TLS 1.3)"| Proxy["Reverse Proxy / CDN (Domain chính & HSTS)"]
-    Owner["Chủ dự án / Admin"] -->|"HTTPS (TLS 1.3)"| Proxy
+    Visitor["Khách thuê phòng (Mobile 360px / Desktop)"] -->|"HTTPS (TLS 1.3)"| VercelClient["Vercel Free: Public Web (client/dist)"]
+    Owner["Chủ dự án / Admin"] -->|"HTTPS (TLS 1.3)"| VercelAdmin["Vercel Free: Admin Web (admin/dist)"]
 
-    Proxy -->|"Route public"| ClientApp["Public Web (client/dist)"]
-    Proxy -->|"Route / origin quản trị riêng"| AdminApp["Admin Web (admin/dist)"]
-    Proxy -->|"/api/v1/* (Forward IP & X-Forwarded-Proto)"| ApiServer["Express 5 API (Node.js 24 LTS)"]
+    VercelClient -->|"GET /api/v1/public/* (HTTPS)"| RenderApi["Render Free Web Service: Express 5 API (Node.js 24)"]
+    VercelAdmin -->|"CRUD /api/v1/admin/* (HTTPS + Secure Cookie)"| RenderApi
 
-    ClientApp -->|"GET /api/v1/public/*"| ApiServer
-    AdminApp -->|"CRUD /api/v1/admin/* (Cookie HttpOnly + Secure)"| ApiServer
+    RenderApi -->|"TLS + IP Allowlist (mongodb+srv)"| MongoAtlas["MongoDB Atlas Free M0 (512 MB - Singapore)"]
+    RenderApi -->|"HTTPS Signed API: Upload / Stream ảnh"| CloudinaryFree["Cloudinary Free (25 Credits/tháng - Không cần thẻ)"]
 
-    ApiServer -->|"TLS / Private Network (IP Allowlist)"| MongoProd["MongoDB 8 (room_rental_prod)"]
-    ApiServer -->|"Đọc/Ghi cô lập (Non-executable)"| ImageStore["Kho lưu trữ ảnh (UPLOAD_DIR / Object Storage)"]
-
-    BackupJob["Lịch sao lưu hàng ngày (backup-system.js)"] -->|"Snapshot EJSON/BSON + Ảnh + SHA-256"| OffsiteBackup["Kho Backup ngoài failure domain (7 Daily + 4 Weekly)"]
-    Monitor["Uptime Monitor & Cảnh báo"] -->|"GET /api/v1/health/ready & /live"| ApiServer
-    Monitor -->|"Email / Zalo / Telegram Alert"| Owner
-    BackupJob -->|"Báo lỗi nếu FAILED"| Monitor
+    BackupJob["Lịch sao lưu hàng ngày (backup-system.js / Cron)"] -->|"Snapshot EJSON + Ảnh + SHA-256"| OffsiteBackup["Kho Backup tách biệt (7 Daily + 4 Weekly)"]
+    Uptime["UptimeRobot Free (Ping mỗi 5 phút - Chống Sleep)"] -->|"GET /api/v1/health/live & /ready"| RenderApi
+    Uptime -->|"Email Cảnh báo khi Down"| Owner
+    BackupJob -->|"Báo lỗi nếu FAILED"| Uptime
 ```
 
 ### 4.2. Ma trận tách biệt 4 môi trường
@@ -134,9 +131,9 @@ flowchart TD
 
 ### 4.3. Tiêu chuẩn Hardening Bảo mật Production (`NFR-04`, `NFR-09`, `NFR-14`, `AT-38`, `AT-48`)
 
-1. **Xử lý Reverse Proxy & Cookie phiên quản trị (`ADMIN_ORIGIN`)**:
-   - Khi chạy sau Nginx/Caddy/Cloudflare với `NODE_ENV=production`, backend bật `TRUST_PROXY` (ví dụ `1` hop) để `request.ip` phản ánh đúng IP máy khách cho cơ chế `loginAttempts` rate-limiter (`10` lần sai / `15` phút) và không bị người dùng khác làm nghẽn IP chung của proxy.
-   - Cookie `admin_session` tự động gắn thuộc tính `Secure` khi `NODE_ENV=production` hoặc `COOKIE_SECURE=true` (`HttpOnly; Secure; SameSite=Lax; Path=/api/v1/admin; Max-Age=43200`).
+1. **Xử lý Reverse Proxy (Vercel/Render) & Cookie phiên quản trị (`ADMIN_ORIGIN`)**:
+   - Khi deploy Backend trên **Render.com** với `NODE_ENV=production`, backend bật `TRUST_PROXY=1` để `request.ip` phản ánh đúng IP máy khách cho cơ chế `loginAttempts` rate-limiter (`10` lần sai / `15` phút) và không bị người dùng khác làm nghẽn IP chung của proxy.
+   - Cookie `admin_session` tự động gắn thuộc tính `Secure` khi `NODE_ENV=production` hoặc `COOKIE_SECURE=true` (`HttpOnly; Secure; Path=/api/v1/admin; Max-Age=43200`). Để trình duyệt gửi cookie ổn định khi Admin Web (`*.vercel.app`) và API (`*.onrender.com`) ở 2 domain khác nhau, cấu hình **Vercel Rewrites** (`/api/* -> https://<backend>.onrender.com/api/*`) để giữ cùng origin với `SameSite=Lax` (ưu tiên cao nhất) hoặc bật `COOKIE_SAMESITE=none` kết hợp `Secure` + kiểm tra nghiêm ngặt `Origin`/`Referer === ADMIN_ORIGIN`.
 2. **Bảo mật HTTP Headers & Chống lạm dụng**:
    - Reverse Proxy ép chuyển hướng mọi yêu cầu `HTTP (80)` sang `HTTPS (443)` với mã `301`, bật `Strict-Transport-Security` (`HSTS`), đảm bảo `0` mixed content trong tải trang và API (`AT-38`).
    - Backend giữ nguyên `app.disable("x-powered-by")`, `helmet()` đầy đủ (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`), giới hạn `express.json({ limit: "1mb" })`, từ chối mọi preflight/request trái origin theo `CLIENT_ORIGIN` và `ADMIN_ORIGIN`.
@@ -172,7 +169,7 @@ flowchart TD
 
 1. **Thư mục đầu ra tách biệt (`BACKUP_ROOT`)**:
    - Cấu hình qua biến môi trường `BACKUP_ROOT` (mặc định local/staging trỏ ngoài kho source và khác phân vùng/Failure Domain trên production).
-   - Quy ước đặt tên gói backup theo UTC: `backup-YYYYMMDD-HHMMSS-<daily|weekly>`.
+   - Quy ước đặt tên gói backup theo UTC: `backup-YYYYMMDD-HHMMSS-mmm-<hex>-<daily|weekly>`.
 2. **Nội dung bên trong mỗi gói backup**:
    - `db/*.ejson.gz`: Xuất toàn bộ 4 collections (`room_listings`, `admin_accounts`, `admin_sessions`, `audit_events`) theo chuẩn Extended JSON nén gzip (bảo toàn chính xác kiểu `Date`, số nguyên `Int`, số thực `Double`, mảng nhúng `images[]`) kèm định nghĩa `indexes.json`.
    - `uploads/`: Bản sao nguyên vẹn các tệp ảnh thuộc kho `UPLOAD_DIR` tương ứng với thời điểm chụp.
@@ -293,15 +290,16 @@ Chi tiết kiểm tra sau mỗi lần deploy (**Smoke Check Production** — `05
 | **`P3` — Trung bình** | Một lỗi hiển thị trên kích thước màn hình hiếm gặp nhưng luồng chính vẫn thao tác được. | Ghi nhận ticket + ảnh chụp màn hình vào nhật ký `11_Change_Management.md` để xử lý trong đợt bảo trì kế tiếp. |
 | **`P4` — Thấp / Cải tiến** | Yêu cầu thêm tiện nghi mới, chỉnh câu chữ, đổi bố cục nhỏ. | Đưa vào backlog cải tiến sau Go-Live, không chỉnh sửa nóng trực tiếp trên production khi chưa qua kiểm thử. |
 
-### 8.3. Bảng kiểm soát Quyền sở hữu Dịch vụ & Chi phí Vận hành (`ADR-07`, `11_Change_Management` 18.6)
+### 8.3. Bảng kiểm soát Quyền sở hữu Dịch vụ & Chi phí Vận hành (`ADR-07` — Cloud Free Tier 0đ)
 
-| Thành phần dịch vụ | Nhà cung cấp dự kiến | Chủ sở hữu tài khoản | Chu kỳ thanh toán & Gia hạn | Mức chi phí ước tính / Tháng |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tên miền & DNS** | *(Chủ dự án điền khi chốt provider)* | **Chủ dự án (`Ngọc Toàn`)** | Hàng năm *(Ghi rõ ngày hết hạn)* | *(Theo bảng giá tên miền)* |
-| **Hosting Web & API (Node.js 24)** | *(VPS / PaaS đã duyệt)* | **Chủ dự án (`Ngọc Toàn`)** | Hàng tháng | *(Đã duyệt trong gói)* |
-| **MongoDB 8 Production** | *(MongoDB Atlas / Managed / Private VPS)* | **Chủ dự án (`Ngọc Toàn`)** | Hàng tháng | *(Đã duyệt trong gói)* |
-| **Lưu trữ ảnh & Offsite Backup** | *(Object Storage S3/R2 hoặc Backup Storage ngoài)* | **Chủ dự án (`Ngọc Toàn`)** | Hàng tháng | *(Theo dung lượng thực tế)* |
-| **Giám sát Uptime & TLS** | *(UptimeRobot / Better Stack / Provider)* | **Chủ dự án (`Ngọc Toàn`)** | Miễn phí / Hàng tháng | `0đ` – *(Gói cơ bản)* |
+| Thành phần dịch vụ | Nền tảng Cloud đã chốt | Chủ sở hữu tài khoản | Hạn mức Free Tier áp dụng | Chi phí thực tế / Tháng |
+| :--- | :--- | :--- | :--- | :---: |
+| **Frontend Public & Admin** | **Vercel (Free Hobby)** *(hoặc Cloudflare Pages)* | **Chủ dự án (`Ngọc Toàn`)** | `100 GB` băng thông/tháng, HTTPS & CDN toàn cầu tự động | **`0đ`** |
+| **Backend API (Node.js 24 LTS)** | **Render.com (Free Web Service)** | **Chủ dự án (`Ngọc Toàn`)** | `512 MB` RAM, tự động deploy từ GitHub, HTTPS sẵn | **`0đ`** |
+| **Database Production** | **MongoDB Atlas (M0 Sandbox Free)** | **Chủ dự án (`Ngọc Toàn`)** | `512 MB` dữ liệu JSON, Replica Set 3 nodes, Region Singapore | **`0đ`** |
+| **Lưu trữ ảnh Production** | **Cloudinary (Free Plan)** | **Chủ dự án (`Ngọc Toàn`)** | `25` credits/tháng (khoảng `25 GB` lưu trữ/băng thông), **không cần thẻ** | **`0đ`** |
+| **Giám sát Uptime & Chống Sleep** | **UptimeRobot (Free Plan)** | **Chủ dự án (`Ngọc Toàn`)** | `50` monitors, ping `/api/v1/health/live` mỗi `5 phút`, cảnh báo Email | **`0đ`** |
+| **Tên miền & DNS** | Subdomain `*.vercel.app` / **Cloudflare DNS Free** | **Chủ dự án (`Ngọc Toàn`)** | Dùng miễn phí subdomain HTTPS sẵn có (chỉ trả phí nếu mua `.vn`/`.com` riêng) | **`0đ`** *(Tùy chọn mua domain riêng)* |
 
 ---
 
@@ -361,13 +359,15 @@ Theo Mục 14.2 của `10_Testing_Acceptance.md` và Mục 17.6 của `08_System
 1. **Khởi tạo & Kiểm tra Build Production sạch secret**:
    ```powershell
    npm --prefix client run lint
+   npm --prefix admin run lint
    npm --prefix client run build
    npm --prefix admin run build
    npm --prefix server run db:init
    ```
-2. **Chạy Sao lưu, Diễn tập Khôi phục Cô lập & Kiểm tra Retention 90 ngày (cần triển khai trong Sprint 4)**:
+2. **Chạy Sao lưu, Diễn tập Khôi phục Cô lập & Kiểm tra Retention 90 ngày (đã triển khai trong Sprint 4)**:
    ```powershell
    npm --prefix server run db:backup
+   npm --prefix server run db:backup:weekly
    npm --prefix server run db:restore:verify
    npm --prefix server run db:purge:dry-run
    ```
@@ -473,3 +473,5 @@ Biên bản được điền đầy đủ và ký xác nhận ngay trong ngày G
 | Thời điểm | Sự kiện / Cập nhật | Trạng thái |
 | :--- | :--- | :--- |
 | **Ban hành tài liệu triển khai Sprint 4** | Hoàn thiện toàn bộ tài liệu `Sprint_4_Nghiem_Thu_Trien_Khai_Production_Go_Live.md` gồm 15 mục chi tiết đồng bộ 100% với bộ BA (`01`–`11`), khóa 8 quyết định kiến trúc `ADR-01`–`ADR-08`, thiết kế kiến trúc hardening HTTPS/Security, bộ công cụ Backup/Restore (7 daily + 4 weekly)/Retention 90 ngày, quy trình làm sạch dữ liệu demo & nhập dữ liệu thật Bình Thạnh 2026, Runbook ứng phó sự cố `P1`–`P4` và ma trận nghiệm thu đầy đủ `AT-01`–`AT-49`. | Hoàn thành soạn thảo tài liệu |
+| **Chốt Kiến trúc Cloud 0đ (Production Free Tier)** | Chủ dự án chốt bộ công nghệ triển khai Production miễn phí (`0đ/tháng`): **Vercel Free** (`client/` & `admin/`), **Render.com Free Web Service** (Backend Node 24/Express 5), **MongoDB Atlas M0 Free 512 MB** (Singapore), **Cloudinary Free (`25` credits/tháng, không cần thẻ)** (Kho ảnh) và **UptimeRobot Free** (Ping 5 phút chống sleep & cảnh báo Email). Bổ sung tài liệu [`Huong_Dan_Deploy_Cloud_0d.md`](<./Huong_Dan_Deploy_Cloud_0d.md>). | Đã đồng bộ vào `Sprint 4`, `08_System_Architecture.md` và `README.md` |
+| **Hoàn thiện Mã nguồn & Kiểm chứng Local Sprint 4** | Triển khai đầy đủ `S4-01`–`S4-08`: Hardening `env.js` / `server.js` / `admin-auth.js` / `mongo.js` (`TRUST_PROXY`, `COOKIE_SECURE`, `COOKIE_SAMESITE`, HSTS), đa driver `imageStorage` (`local` + `cloudinary` signed API không thêm dependency ngoài), guard chống chạy seed trên production, `vercel.json` (`/api/*` rewrites) + `render.yaml`, bộ script `backup-system.js` / `restore-system.js` / `purge-expired.js` và bộ kiểm thử `verify:sprint4` (`SPRINT_4_GOLIVE_VERIFICATION_PASSED`), hồi quy `verify:sprint2` & lint/build `client`/`admin` (`0` lỗi). | Hoàn thành phần kỹ thuật local; sẵn sàng cấu hình tài khoản Cloud 0đ & Go-Live (`S4-09`, `S4-10`) |

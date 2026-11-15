@@ -325,7 +325,7 @@ router.post("/auth/login", requireSameOrigin, async (request, response, next) =>
       createdAt: now,
     });
 
-    response.setHeader("Set-Cookie", cookieValue(sessionToken, SESSION_MAX_AGE_SECONDS, env.NODE_ENV === "production"));
+    response.setHeader("Set-Cookie", cookieValue(sessionToken, SESSION_MAX_AGE_SECONDS, env.COOKIE_SECURE_EFFECTIVE));
     response.setHeader("Cache-Control", "no-store");
     return response.json({
       admin: {
@@ -381,7 +381,7 @@ router.post("/auth/change-password", requireSameOrigin, requireAdmin, async (req
     });
     await audit(request, "password_changed", "admin", request.admin.id);
 
-    response.setHeader("Set-Cookie", cookieValue(nextToken, SESSION_MAX_AGE_SECONDS, env.NODE_ENV === "production"));
+    response.setHeader("Set-Cookie", cookieValue(nextToken, SESSION_MAX_AGE_SECONDS, env.COOKIE_SECURE_EFFECTIVE));
     response.setHeader("Cache-Control", "no-store");
     return response.json({ admin: { ...request.admin, mustChangePassword: false } });
   } catch (error) {
@@ -394,7 +394,7 @@ router.post("/auth/logout", requireSameOrigin, requireAdmin, async (request, res
     const { adminSessions } = await getCollections();
     await adminSessions.updateOne({ tokenHash: request.sessionHash }, { $set: { revokedAt: new Date() } });
     await audit(request, "logout", "admin", request.admin.id);
-    clearSessionCookie(response, env.NODE_ENV === "production");
+    clearSessionCookie(response, env.COOKIE_SECURE_EFFECTIVE);
     response.setHeader("Cache-Control", "no-store");
     return response.status(204).end();
   } catch (error) {
@@ -805,7 +805,7 @@ router.post(
   requireSameOriginForWrites,
   require("express").raw({ type: "multipart/form-data", limit: "11mb" }),
   async (request, response, next) => {
-    let savedPath = "";
+    let savedImage = null;
     try {
       if (!UUID.test(request.params.roomId)) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy tin phòng.");
       const { fileBuffer, mimeType, originalName } = parseSingleMultipartFile(request);
@@ -819,7 +819,12 @@ router.post(
       const id = randomUUID();
       const storageKey = `${id}.${imageExtension(mimeType)}`;
       const now = new Date();
-      savedPath = await imageStorage.write({ listingId: request.params.roomId, storageKey, buffer: fileBuffer });
+      savedImage = await imageStorage.write({
+        listingId: request.params.roomId,
+        storageKey,
+        buffer: fileBuffer,
+        mimeType,
+      });
 
       const { roomListings } = await getCollections();
       const updated = await roomListings.findOneAndUpdate(
@@ -838,6 +843,9 @@ router.post(
                     {
                       id,
                       storageKey,
+                      provider: savedImage.provider,
+                      externalUrl: savedImage.externalUrl,
+                      cloudinaryPublicId: savedImage.cloudinaryPublicId,
                       mimeType,
                       byteSize: fileBuffer.length,
                       originalName,
@@ -859,7 +867,12 @@ router.post(
       );
 
       if (!updated) {
-        await imageStorage.remove({ listingId: request.params.roomId, storageKey }).catch(() => {});
+        await imageStorage.remove({
+          listingId: request.params.roomId,
+          storageKey,
+          provider: savedImage.provider,
+          cloudinaryPublicId: savedImage.cloudinaryPublicId,
+        }).catch(() => {});
         const stillExists = await getListing(request.params.roomId);
         if (!stillExists) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy tin phòng.");
         return sendError(response, request, 413, "IMAGE_LIMIT_REACHED", "Một tin chỉ được có tối đa 15 ảnh.");
@@ -870,11 +883,17 @@ router.post(
         listingId: request.params.roomId,
         mimeType,
         byteSize: fileBuffer.length,
+        provider: savedImage.provider,
       });
       return response.status(201).json({ item: toImage(insertedImage, request.params.roomId) });
     } catch (error) {
-      if (savedPath) {
-        await imageStorage.remove({ listingId: request.params.roomId, storageKey: path.basename(savedPath) }).catch(() => {});
+      if (savedImage) {
+        await imageStorage.remove({
+          listingId: request.params.roomId,
+          storageKey: savedImage.storageKey,
+          provider: savedImage.provider,
+          cloudinaryPublicId: savedImage.cloudinaryPublicId,
+        }).catch(() => {});
       }
       return next(error);
     }
@@ -894,13 +913,13 @@ router.get("/rooms/:roomId/images/:imageId/file", async (request, response, next
     const image = doc?.images?.[0];
     if (!image) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy ảnh.");
 
-    const filePath = imageStorage.getPath({ listingId: request.params.roomId, storageKey: image.storageKey });
-    response.setHeader("Content-Type", image.mimeType);
-    response.setHeader("Content-Disposition", 'inline; filename="room-image"');
     response.setHeader("Cache-Control", "private, no-store");
-    response.setHeader("X-Content-Type-Options", "nosniff");
-    return response.sendFile(filePath, (error) => {
-      if (error && !response.headersSent) next(error);
+    return imageStorage.sendHttpResponse({
+      response,
+      listingId: request.params.roomId,
+      image,
+      optimizeForPublic: false,
+      next,
     });
   } catch (error) {
     return next(error);
@@ -1012,7 +1031,12 @@ router.delete("/rooms/:roomId/images/:imageId", async (request, response, next) 
       return sendError(response, request, 409, "CONCURRENT_UPDATE", "Dữ liệu tin vừa thay đổi. Vui lòng thử lại.");
     }
 
-    await imageStorage.remove({ listingId: request.params.roomId, storageKey: removed.storageKey }).catch(() => {});
+    await imageStorage.remove({
+      listingId: request.params.roomId,
+      storageKey: removed.storageKey,
+      provider: removed.provider,
+      cloudinaryPublicId: removed.cloudinaryPublicId,
+    }).catch(() => {});
     await audit(request, "image_removed", "room_image", removed.id, { listingId: request.params.roomId });
     return response.status(204).end();
   } catch (error) {

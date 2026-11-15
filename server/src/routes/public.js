@@ -325,11 +325,12 @@ router.get("/rooms/:roomId/images/:imageId/file", async (request, response, next
       return response.status(304).end();
     }
 
-    const filePath = imageStorage.getPath({ listingId: request.params.roomId, storageKey: image.storageKey });
-    response.setHeader("Content-Type", image.mimeType);
-    response.setHeader("Content-Disposition", 'inline; filename="room-image"');
-    return response.sendFile(filePath, (error) => {
-      if (error && !response.headersSent) next(error);
+    return imageStorage.sendHttpResponse({
+      response,
+      listingId: request.params.roomId,
+      image,
+      optimizeForPublic: true,
+      next,
     });
   } catch (error) {
     return next(error);

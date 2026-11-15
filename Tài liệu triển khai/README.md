@@ -20,7 +20,7 @@ Về **Sprint 2**, hệ thống đã hoàn thành đầy đủ phần triển kh
 
 Bước sang **Sprint 3**, hệ thống đã **hoàn thành kỹ thuật** toàn bộ hạng mục theo [Sprint 3](<./Sprint_3_Tim_Kiem_Loc_Nang_Cao_Toi_Uu_UX_Hieu_Nang.md>): đồng bộ **5 phường Quận Bình Thạnh năm 2026** (`1685/NQ-UBTVQH15`), chuẩn hóa tiện nghi (`Thang máy` thay `Máy giặt`), nâng cấp UX Admin (`/rooms/new` tải ảnh & chọn ảnh bìa trước khi lưu nháp, xuất bản chuyển về Tổng quan `/`), bổ sung lọc theo nhiều tiện nghi (`amenities`), `AbortController`, `SafeImage` (`fetchpriority="high"`/`loading="lazy"`), `ETag`/`304`, index MongoDB mới (`idx_public_rooms_area`, `idx_public_rooms_amenities`), và kiểm chứng benchmark `500` tin trên mạng 4G giả lập (`room_rental_perf`) đạt **`p75 = 1352.1 ms`** (`≤ 3000 ms`) với **`maxCLS = 0.0001`**.
 
-Kết quả hiện tại phục vụ phát triển và kiểm thử local, chưa phải website đã triển khai production.
+Kết quả hiện tại phục vụ phát triển và kiểm thử local, sẵn sàng bước vào **Sprint 4 (Go-Live Production)** với **Kiến trúc Cloud 0đ (Production Free Tier Stack)** đã chốt: **Vercel Free** (`client/` & `admin/`), **Render.com Free Web Service** (Backend Node 24/Express 5), **MongoDB Atlas M0 Free 512 MB** (Singapore), **Cloudinary Free** (`25` credits/tháng — kho ảnh không cần thẻ) và **UptimeRobot Free** (giữ backend luôn thức & cảnh báo Email).
 
 ## Kế hoạch sprint dự kiến
 

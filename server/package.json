@@ -11,8 +11,13 @@
     "db:migrate": "node scripts/init-db.js",
     "db:seed:sprint2": "node scripts/seed-sprint2.js",
     "db:seed:perf500": "node scripts/seed-perf-500.js",
+    "db:backup": "node scripts/backup-system.js",
+    "db:backup:weekly": "node scripts/backup-system.js --type=weekly",
+    "db:restore:verify": "node scripts/restore-system.js",
+    "db:purge:dry-run": "node scripts/purge-expired.js",
     "verify:sprint2": "node scripts/verify-sprint2-public.js",
     "verify:sprint3": "node scripts/verify-sprint3-perf.js",
+    "verify:sprint4": "node scripts/verify-sprint4-golive.js",
     "admin:provision": "node scripts/provision-admin.js"
   },
   "keywords": [],

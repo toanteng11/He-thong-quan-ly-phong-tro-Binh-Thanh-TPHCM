@@ -25,11 +25,11 @@ function tokenHash(token) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function cookieValue(token, maxAgeSeconds, secure) {
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAgeSeconds}${secure ? "; Secure" : ""}`;
+function cookieValue(token, maxAgeSeconds, secure = env.COOKIE_SECURE_EFFECTIVE) {
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=${env.COOKIE_SAMESITE}; Max-Age=${maxAgeSeconds}${secure ? "; Secure" : ""}`;
 }
 
-function clearSessionCookie(response, secure) {
+function clearSessionCookie(response, secure = env.COOKIE_SECURE_EFFECTIVE) {
   response.setHeader("Set-Cookie", cookieValue("", 0, secure));
 }
 
@@ -63,7 +63,7 @@ async function requireAdmin(request, response, next) {
       : null;
 
     if (!session || !account) {
-      clearSessionCookie(response, env.NODE_ENV === "production");
+      clearSessionCookie(response, env.COOKIE_SECURE_EFFECTIVE);
       return response.status(401).json({
         error: {
           code: "SESSION_EXPIRED",

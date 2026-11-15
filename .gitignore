@@ -13,6 +13,8 @@
 /uploads/
 /server/uploads/
 /server/uploads-perf/
+/server/uploads-restore-test/
+/server/backups/
 *.dump
 *.sql.gz
 

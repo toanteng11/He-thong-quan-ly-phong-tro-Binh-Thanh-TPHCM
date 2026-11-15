@@ -6,9 +6,13 @@ const { deflateSync } = require("node:zlib");
 
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
-// Bảo vệ tuyệt đối dữ liệu thật trên room_rental_dev: chỉ cho phép seed vào DB benchmark riêng
+// Bảo vệ tuyệt đối dữ liệu thật trên room_rental_dev và production: chỉ cho phép seed vào DB benchmark riêng
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Refusing to run benchmark seed script when NODE_ENV=production!");
+}
 const targetDb = process.env.PERF_DB_NAME || "room_rental_perf";
 assert.notEqual(targetDb, "room_rental_dev", "Refusing to seed 500 perf records into room_rental_dev!");
+assert.equal(/prod/i.test(targetDb), false, "Refusing to seed 500 perf records into a production database!");
 process.env.MONGODB_DB_NAME = targetDb;
 process.env.UPLOAD_DIR = process.env.PERF_UPLOAD_DIR || "uploads-perf";
 
