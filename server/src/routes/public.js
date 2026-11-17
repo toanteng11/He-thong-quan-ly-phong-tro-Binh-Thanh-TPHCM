@@ -3,6 +3,12 @@ const { z } = require("zod");
 const { getCollections } = require("../db/mongo");
 const { env } = require("../config/env");
 const { imageStorage } = require("../storage/image-storage");
+const {
+  OWNER_CONTACT,
+  SYSTEM_KNOWLEDGE_PROMPT,
+  expandLocationFromKnowledge,
+  buildFaqFallbackAnswer,
+} = require("../knowledge/binh-thanh-knowledge");
 
 const router = Router();
 
@@ -465,6 +471,11 @@ function parseChatIntent(foldedMsg) {
     targetWard = "Phường Bình Thạnh";
   }
 
+  const { inferredWard, expandedStreets } = expandLocationFromKnowledge(foldedMsg);
+  if (!targetWard && inferredWard) {
+    targetWard = inferredWard;
+  }
+
   // Các cụm địa điểm / tên đường cụ thể khách hay nhắc
   const locationKeywords = [
     "ung van khiem",
@@ -476,20 +487,33 @@ function parseChatIntent(foldedMsg) {
     "bach dang",
     "chu van an",
     "nguyen cuu van",
+    "vo oanh",
+    "nguyen gia tri",
+    "nguyen van thuong",
+    "duong d1",
+    "duong d2",
+    "duong d3",
+    "duong d5",
     "hang xanh",
     "hutech",
     "ngoai thuong",
+    "ftu",
     "uth",
     "gtvt",
     "van lang",
     "hoc vien can bo",
     "thanh da",
     "binh quoi",
+    "binh loi",
+    "dang thuy tram",
+    "pham van dong",
     "no trang long",
     "le quang dinh",
     "phan van tri",
     "dien bien phu",
     "phan dang luu",
+    "landmark",
+    "ba chieu",
     "quan 1",
     "q1",
   ].filter((kw) => foldedMsg.includes(kw));
@@ -523,6 +547,7 @@ function parseChatIntent(foldedMsg) {
     maxBudget,
     targetWard,
     locationKeywords,
+    expandedStreets,
     amenityHints,
     roomTypeHint,
     featureKeywords,
@@ -574,11 +599,15 @@ function evaluateRoomsForChat(docs, message) {
         score -= 35;
       }
     }
-    if (intent.locationKeywords.length) {
+    if (intent.locationKeywords.length || (intent.expandedStreets || []).length) {
       const locMatched = intent.locationKeywords.some((kw) => fullText.includes(kw));
+      const nearbyMatched = !locMatched && (intent.expandedStreets || []).some((st) => fullText.includes(st));
       if (locMatched) {
         matchedCount += 1;
         score += 40;
+      } else if (nearbyMatched) {
+        matchedCount += 1;
+        score += 32;
       } else {
         failedCount += 1;
         score += intent.targetWard && doc.ward === intent.targetWard ? -10 : -35;
@@ -658,6 +687,7 @@ function buildFallbackReply(docs, evaluation, message) {
   }
 
   const folded = foldVi(message);
+  const faqAnswer = buildFaqFallbackAnswer(folded, evaluation.hasExplicitCriteria);
   const isGreetingOnly = /^(?:hi|hello|alo|chao|xin chao|bot oi|ad oi|tu van|help|cam on|thank)[!.,\s]*$/.test(folded);
   const isContactQuestion = /(?:lien he|sdt|so dien thoai|zalo|xem phong|dat lich|dia chi)/.test(folded) && !evaluation.hasExplicitCriteria;
 
@@ -672,20 +702,16 @@ function buildFallbackReply(docs, evaluation, message) {
     };
   }
 
-  if (isContactQuestion) {
-    const contactDoc = availableDocs.find((d) => (d.allowPublicPhone && d.contactPhone) || (d.allowPublicZalo && d.contactZalo));
-    const contactInfo = contactDoc
-      ? [
-          contactDoc.allowPublicPhone && contactDoc.contactPhone ? `SĐT: ${contactDoc.contactPhone}` : "",
-          contactDoc.allowPublicZalo && contactDoc.contactZalo ? `Zalo: ${contactDoc.contactZalo}` : "",
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : "";
+  if (faqAnswer && !evaluation.hasExplicitCriteria) {
     return {
-      reply: contactInfo
-        ? `Để đặt lịch xem phòng nhanh nhất, bạn có thể liên hệ trực tiếp chủ trọ qua ${contactInfo}, hoặc bấm vào từng phòng để nhấn nút Gọi / Nhắn Zalo nhé!`
-        : "Bạn hãy bấm vào căn phòng bạn thích rồi nhấn nút Gọi điện hoặc Nhắn Zalo để hẹn giờ xem phòng trực tiếp nha!",
+      reply: faqAnswer,
+      rooms: [],
+    };
+  }
+
+  if (isContactQuestion) {
+    return {
+      reply: `Để đặt lịch xem phòng miễn phí (${OWNER_CONTACT.supportHours}) hoặc hỏi chi tiết từng căn, bạn liên hệ trực tiếp anh ${OWNER_CONTACT.managerName} qua Hotline/Zalo ${OWNER_CONTACT.phoneDisplay} (${OWNER_CONTACT.zaloUrl}), hoặc bấm vào phòng bạn thích để nhấn Gọi / Nhắn Zalo nhé!`,
       rooms: [],
     };
   }
@@ -695,22 +721,30 @@ function buildFallbackReply(docs, evaluation, message) {
     const summaryLines = picks.map(
       (r) => `• ${r.title} (${(Number(r.priceVnd || 0) / 1_000_000).toLocaleString("vi-VN")}tr · ${r.areaM2}m² · ${r.ward})`,
     );
+    const roomText = `Bé Toàn AI tìm thấy ${evaluation.exactMatches.length} phòng còn trống khớp yêu cầu của bạn nè:\n${summaryLines.join("\n")}\nBạn chạm vào thẻ phòng bên dưới để xem hình thật & gọi/nhắn Zalo ${OWNER_CONTACT.phoneDisplay} nhé!`;
     return {
-      reply: `Bé Toàn AI tìm thấy ${evaluation.exactMatches.length} phòng còn trống khớp đúng yêu cầu của bạn nè:\n${summaryLines.join("\n")}\nBạn chạm vào thẻ phòng bên dưới để xem hình thật & gọi/nhắn Zalo nhé!`,
+      reply: faqAnswer ? `${faqAnswer}\n\n${roomText}` : roomText,
       rooms: picks.map(toPublicListItem),
+    };
+  }
+
+  if (faqAnswer) {
+    return {
+      reply: faqAnswer,
+      rooms: [],
     };
   }
 
   if (evaluation.closestMatches.length > 0) {
     const picks = evaluation.closestMatches.slice(0, 2).map((item) => item.doc);
     return {
-      reply: "Hic, hiện chưa có phòng nào khớp trọn vẹn 100% các tiêu chí bạn cần ạ. Mình gợi ý 2 căn gần nhất đang còn trống để bạn tham khảo thử nha:",
+      reply: `Hic, hiện chưa có phòng nào khớp trọn vẹn 100% các tiêu chí bạn cần ạ. Mình gợi ý 2 căn gần nhất đang còn trống để bạn tham khảo thử nha (hoặc nhắn Zalo ${OWNER_CONTACT.phoneDisplay} để Toàn kiểm tra thêm căn mới nhé):`,
       rooms: picks.map(toPublicListItem),
     };
   }
 
   return {
-    reply: `Hiện chưa có phòng nào phù hợp tiêu chí này trong ${availableDocs.length} phòng trống của bên mình ạ. Bạn thử nói rõ hơn tầm giá (vd: dưới 4tr) hoặc khu vực ở Bình Thạnh giúp Bé Toàn AI nhé!`,
+    reply: `Hiện chưa có phòng nào phù hợp tiêu chí này trong ${availableDocs.length} phòng trống của bên mình ạ. Bạn thử nói rõ hơn tầm giá (vd: dưới 4tr) hoặc khu vực ở Bình Thạnh, hoặc nhắn Zalo ${OWNER_CONTACT.phoneDisplay} để Toàn hỗ trợ tìm giúp nhé!`,
     rooms: [],
   };
 }
@@ -718,7 +752,7 @@ function buildFallbackReply(docs, evaluation, message) {
 function buildGeminiConfig(systemText) {
   const generationConfig = {
     temperature: 0.35,
-    maxOutputTokens: 500,
+    maxOutputTokens: 650,
     responseMimeType: "application/json",
     responseSchema: {
       type: "OBJECT",
@@ -834,12 +868,16 @@ router.post("/chat", async (request, response, next) => {
 
     const systemText = [
       'Bạn tên là "Bé Toàn AI", trợ lý AI thông minh, dễ thương, lịch sự của hệ thống Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
-      "NHIỆM VỤ: Đọc kỹ câu hỏi của khách, đối chiếu chính xác với JSON phòng còn trống bên dưới và trả về đúng định dạng JSON { reply, recommendedRoomIds }.",
+      "NHIỆM VỤ: Đọc kỹ câu hỏi của khách, dựa vào BỘ KIẾN THỨC ĐỊA BÀN & CHÍNH SÁCH bên dưới để giải đáp (về trường học, đường gần trường, siêu thị, cửa hàng tiện lợi, tiền cọc, hợp đồng, điện nước/dịch vụ/xe, liên hệ) VÀ đối chiếu với JSON phòng còn trống để chọn phòng phù hợp nhất theo định dạng JSON { reply, recommendedRoomIds }.",
       "QUY TẮC NGHIÊM NGẶT:",
-      "1. CHỈ được đưa vào `recommendedRoomIds` tối đa 3 ID phòng THẬT SỰ KHỚP với yêu cầu về giá, khu vực/đường, loại phòng và tiện nghi của khách. Tuyệt đối KHÔNG nhét phòng không khớp (sai tầm giá hoặc thiếu tiện nghi bắt buộc khách hỏi) vào `recommendedRoomIds`.",
-      "2. Nếu KHÔNG có phòng nào khớp tiêu chí khách hỏi (ví dụ khách hỏi quá rẻ hoặc hỏi tiện nghi không có), hãy để `recommendedRoomIds: []` (hoặc tối đa 1 phòng sát nhất nếu thực sự gần), thành thật báo chưa có phòng khớp và gợi ý mức giá/khu vực gần nhất đang có.",
-      "3. KHÔNG được tự bịa phòng, giá, diện tích, địa chỉ số nhà cụ thể hay SĐT không có trong dữ liệu.",
-      "4. Câu trả lời `reply` tự nhiên, thân thiện, ngắn gọn (2-5 câu), nêu đúng tên/giá của các phòng bạn đã chọn trong `recommendedRoomIds`.",
+      "1. CHỈ được đưa vào `recommendedRoomIds` tối đa 3 ID phòng THẬT SỰ KHỚP với yêu cầu về giá, khu vực/đường (kể cả các tuyến đường gần trường ĐH nêu trong bản đồ kiến thức), loại phòng và tiện nghi của khách. Tuyệt đối KHÔNG nhét phòng không khớp (sai tầm giá hoặc thiếu tiện nghi bắt buộc) vào `recommendedRoomIds`.",
+      "2. Nếu khách chỉ hỏi câu hỏi chính sách/kiến thức chung (vd: cọc bao nhiêu tháng, cọc bao nhiêu tiền, tiền điện nước phí xe, giờ giấc, đường nào gần UTH/Hutech) mà chưa yêu cầu xem phòng cụ thể, có thể để `recommendedRoomIds: []` và trả lời đầy đủ, thân thiện theo đúng BỘ KIẾN THỨC.",
+      "3. Nếu khách tìm phòng nhưng KHÔNG có phòng nào khớp, hãy để `recommendedRoomIds: []` (hoặc tối đa 1 phòng sát nhất nếu thực sự gần), thành thật báo chưa có phòng khớp và mời khách liên hệ SĐT/Zalo 0947 832 801 để Toàn hỗ trợ tìm thêm.",
+      "4. TUYỆT ĐỐI KHÔNG tự bịa phòng, địa chỉ số nhà cụ thể, hoặc tự bịa giá điện/nước/dịch vụ/phí xe nếu không ghi trong dữ liệu phòng; khi khách hỏi điện/nước/dịch vụ/phí xe, luôn hướng dẫn liên hệ Ngọc Toàn (0947 832 801 / Zalo).",
+      "5. Câu trả lời `reply` tự nhiên, thân thiện, ngắn gọn (2–6 câu), rõ ràng.",
+      "",
+      SYSTEM_KNOWLEDGE_PROMPT,
+      "",
       `DANH SÁCH PHÒNG CÒN TRỐNG THẬT (${groundedCatalog.length} phòng):`,
       JSON.stringify(groundedCatalog),
     ].join("\n");
