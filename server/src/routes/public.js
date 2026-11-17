@@ -516,6 +516,16 @@ function parseChatIntent(foldedMsg) {
     "ba chieu",
     "quan 1",
     "q1",
+    "phu nhuan",
+    "go vap",
+    "thu duc",
+    "thao dien",
+    "quan 2",
+    "q2",
+    "quan 3",
+    "q3",
+    "san bay",
+    "metro",
   ].filter((kw) => foldedMsg.includes(kw));
 
   const amenityHints = AMENITIES.filter((item) => {
