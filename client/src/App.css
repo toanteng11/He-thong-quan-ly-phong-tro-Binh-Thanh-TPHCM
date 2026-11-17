@@ -290,6 +290,8 @@ textarea:focus-visible {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .public-header-wrap {
@@ -302,7 +304,8 @@ textarea:focus-visible {
 }
 
 .public-container {
-  width: min(100% - 48px, 1240px);
+  width: calc(100% - 48px);
+  max-width: 1240px;
   margin: 0 auto;
 }
 
@@ -747,6 +750,7 @@ textarea:focus-visible {
 }
 
 .public-room-card {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -825,6 +829,7 @@ textarea:focus-visible {
 }
 
 .card-body {
+  min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -832,6 +837,7 @@ textarea:focus-visible {
 }
 
 .card-price-row {
+  min-width: 0;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1006,6 +1012,10 @@ textarea:focus-visible {
   grid-template-columns: minmax(0, 1.32fr) minmax(320px, 0.88fr);
   gap: 28px;
   align-items: start;
+}
+
+.detail-layout > * {
+  min-width: 0;
 }
 
 .gallery-card {
@@ -1597,10 +1607,17 @@ textarea:focus-visible {
 
 @media (max-width: 767px) {
   .public-container {
-    width: min(100% - 20px, 1240px);
+    width: calc(100% - 20px);
+    max-width: 1240px;
   }
   .public-header {
     min-height: 54px;
+    gap: 10px;
+  }
+  .public-nav-link {
+    padding: 0 10px;
+    font-size: 13px;
+    white-space: nowrap;
   }
   .public-nav-link.hide-mobile {
     display: none;
@@ -1724,6 +1741,7 @@ textarea:focus-visible {
     min-height: 0;
   }
   .card-location {
+    min-width: 0;
     font-size: 11px;
     line-height: 1.3;
     gap: 4px;
@@ -1735,6 +1753,8 @@ textarea:focus-visible {
     margin-top: 0;
   }
   .card-location span {
+    min-width: 0;
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1791,10 +1811,64 @@ textarea:focus-visible {
   .consult-bot-window {
     width: calc(100vw - 24px);
     height: min(490px, calc(100vh - 150px));
+    height: min(490px, calc(100dvh - 150px));
     border-radius: 18px;
   }
   .consult-bot-form input {
     font-size: 16px;
+  }
+}
+
+/* Fallback for older mobile WebKit/Safari < 15 lacking aspect-ratio */
+@supports not (aspect-ratio: 4 / 3) {
+  .card-media-link,
+  .skeleton-thumb,
+  .gallery-stage {
+    height: 150px;
+  }
+  @media (min-width: 768px) {
+    .card-media-link,
+    .skeleton-thumb {
+      height: 220px;
+    }
+    .gallery-stage {
+      height: 380px;
+    }
+  }
+}
+
+/* Extra-compact phones (320px - 380px) keep identical 2-column framing without clipping */
+@media (max-width: 380px) {
+  .public-container {
+    width: calc(100% - 16px);
+  }
+  .brand-logo {
+    height: 34px;
+    max-width: 145px;
+  }
+  .public-nav-link {
+    min-height: 36px;
+    padding: 0 9px;
+    font-size: 12.5px;
+  }
+  .public-room-grid {
+    gap: 8px;
+  }
+  .card-body {
+    padding: 7px 8px 9px;
+  }
+  .card-price {
+    font-size: 12.5px;
+  }
+  .card-area {
+    padding: 2px 5px;
+    font-size: 9.5px;
+  }
+  .card-title-link {
+    font-size: 12px;
+  }
+  .card-location {
+    font-size: 10.5px;
   }
 }
 

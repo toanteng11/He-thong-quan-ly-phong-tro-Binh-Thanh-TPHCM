@@ -90,6 +90,10 @@ html {
   min-height: 100%;
   background: var(--bg-canvas);
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -100,6 +104,8 @@ body {
   line-height: 1.6;
   color: var(--ink-700);
   background: var(--bg-canvas);
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 button, input, select, textarea {
