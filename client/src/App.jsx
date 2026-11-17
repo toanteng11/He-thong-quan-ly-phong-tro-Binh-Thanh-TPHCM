@@ -253,7 +253,24 @@ function App() {
 /* =========================================================
    PUBLIC COMPONENTS
    ========================================================= */
+const FOOTER_QUICK_LINKS = [
+  { label: 'Tất cả phòng Bình Thạnh', to: '/rooms' },
+  { label: 'Phòng đang còn trống', to: '/rooms?availability=AVAILABLE' },
+  { label: 'Phòng có gác lửng', to: `/rooms?amenities=${encodeURIComponent('Gác lửng')}` },
+  { label: 'Phòng studio', to: `/rooms?roomType=${encodeURIComponent('Phòng studio')}` },
+  { label: 'Phòng có ban công', to: `/rooms?amenities=${encodeURIComponent('Ban công')}` },
+]
+
+const FOOTER_AREA_LINKS = [
+  { label: 'Đường Đinh Bộ Lĩnh', to: `/rooms?q=${encodeURIComponent('Đinh Bộ Lĩnh')}` },
+  { label: 'Đường Ung Văn Khiêm', to: `/rooms?q=${encodeURIComponent('Ung Văn Khiêm')}` },
+  { label: 'Đường Xô Viết Nghệ Tĩnh', to: `/rooms?q=${encodeURIComponent('Xô Viết Nghệ Tĩnh')}` },
+  { label: 'Đường Bùi Đình Túy', to: `/rooms?q=${encodeURIComponent('Bùi Đình Túy')}` },
+  { label: 'Đường Điện Biên Phủ', to: `/rooms?q=${encodeURIComponent('Điện Biên Phủ')}` },
+]
+
 function PublicLayout({ navigate, active = 'rooms', children }) {
+  const currentYear = new Date().getFullYear()
   return (
     <div className="public-shell">
       <header className="public-header-wrap">
@@ -271,11 +288,117 @@ function PublicLayout({ navigate, active = 'rooms', children }) {
         </div>
       </header>
       {children}
-      <footer className="public-footer">
-        <div className="public-container public-footer-inner">
-          <span>
-            <strong>{branding.name}</strong> · {branding.cityLabel}
-          </span>
+      <footer className="public-footer" aria-label="Thông tin liên hệ và chân trang">
+        <div className="public-container">
+          <div className="footer-cta-band">
+            <div className="footer-cta-copy">
+              <span className="footer-cta-eyebrow">
+                <Icon name="sparkles" size={14} /> Hỗ trợ tìm phòng nhanh tại Bình Thạnh
+              </span>
+              <h2>Mọi thắc mắc hoặc cần tư vấn xem phòng?</h2>
+              <p>
+                Nhắn ngay cho <strong>{branding.managerName}</strong> để được báo phòng trống thực tế mới nhất,
+                tư vấn đúng ngân sách và hẹn dẫn xem phòng miễn phí.
+              </p>
+            </div>
+            <div className="footer-cta-actions">
+              <a href={`tel:${branding.phone}`} className="button button-primary">
+                <Icon name="phone" size={17} /> Gọi {branding.phoneDisplay}
+              </a>
+              <a
+                href={branding.zaloUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="button button-zalo"
+              >
+                <Icon name="message" size={17} /> Nhắn Zalo trực tiếp
+              </a>
+            </div>
+          </div>
+
+          <div className="footer-main-grid">
+            <div className="footer-brand-col">
+              <Brand to="/rooms" navigate={navigate} />
+              <p className="footer-brand-desc">
+                Chuyên phòng trọ, phòng có gác, studio và căn hộ mini khu vực Quận Bình Thạnh — gần ĐH Hutech,
+                UTH, Ngoại Thương, Hồng Bàng.
+              </p>
+              <ul className="footer-trust-list">
+                <li>
+                  <Icon name="check" size={15} /> Hình ảnh & giá phòng minh bạch 100%
+                </li>
+                <li>
+                  <Icon name="check" size={15} /> Hỗ trợ đi xem phòng trực tiếp miễn phí
+                </li>
+                <li>
+                  <Icon name="check" size={15} /> Giờ giấc tự do, an ninh, hợp đồng rõ ràng
+                </li>
+              </ul>
+            </div>
+
+            <div className="footer-col">
+              <h3>Liên hệ trực tiếp</h3>
+              <ul className="footer-contact-list">
+                <li>
+                  <Icon name="shield" size={16} />
+                  <span>
+                    Phụ trách: <strong>{branding.managerName}</strong>
+                  </span>
+                </li>
+                <li>
+                  <Icon name="phone" size={16} />
+                  <a href={`tel:${branding.phone}`}>Hotline: {branding.phoneDisplay}</a>
+                </li>
+                <li>
+                  <Icon name="message" size={16} />
+                  <a href={branding.zaloUrl} target="_blank" rel="noopener noreferrer">
+                    Zalo: {branding.phoneDisplay}
+                  </a>
+                </li>
+                <li>
+                  <Icon name="clock" size={16} />
+                  <span>{branding.supportHours}</span>
+                </li>
+                <li>
+                  <Icon name="location" size={16} />
+                  <span>{branding.cityLabel}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="footer-col">
+              <h3>Tìm phòng nhanh</h3>
+              <ul className="footer-link-list">
+                {FOOTER_QUICK_LINKS.map((item) => (
+                  <li key={item.to}>
+                    <AppLink to={item.to} navigate={navigate}>
+                      <Icon name="chevron" size={14} /> {item.label}
+                    </AppLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="footer-col">
+              <h3>Tuyến đường nổi bật</h3>
+              <ul className="footer-link-list">
+                {FOOTER_AREA_LINKS.map((item) => (
+                  <li key={item.to}>
+                    <AppLink to={item.to} navigate={navigate}>
+                      <Icon name="location" size={14} /> {item.label}
+                    </AppLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <span>
+              © {currentYear} <strong>{branding.name}</strong> · {branding.areaLabel}.
+            </span>
+            <span>Hỗ trợ sinh viên &amp; người đi làm tìm phòng nhanh chóng, uy tín tại Bình Thạnh.</span>
+          </div>
         </div>
       </footer>
     </div>
