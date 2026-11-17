@@ -10,6 +10,14 @@ const DEFAULT_AMENITIES = [
   'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
   'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',
 ]
+const QUICK_PRICE_PRESETS = [
+  { label: 'Tất cả', min: '', max: '' },
+  { label: '2 – 3tr', min: '2000000', max: '3000000' },
+  { label: '3 – 4tr', min: '3000000', max: '4000000' },
+  { label: '4 – 5tr', min: '4000000', max: '5000000' },
+  { label: '5 – 6tr', min: '5000000', max: '6000000' },
+  { label: 'Trên 6tr', min: '6000000', max: '' },
+]
 
 const defaultPublicFilters = {
   q: '',
@@ -369,7 +377,10 @@ function PublicCatalogPage({ location, navigate }) {
   }
 
   const setQuickPrice = (minPriceVnd, maxPriceVnd) => {
-    const next = { ...draft, minPriceVnd, maxPriceVnd }
+    const isSame = draft.minPriceVnd === minPriceVnd && draft.maxPriceVnd === maxPriceVnd
+    const next = isSame && (minPriceVnd !== '' || maxPriceVnd !== '')
+      ? { ...draft, minPriceVnd: '', maxPriceVnd: '' }
+      : { ...draft, minPriceVnd, maxPriceVnd }
     setDraft(next)
     commitFilters(next, 1)
   }
@@ -383,6 +394,27 @@ function PublicCatalogPage({ location, navigate }) {
     if (commitNow) {
       commitFilters(next, 1)
     }
+  }
+
+  const toggleStudioQuick = () => {
+    const nextRoomType = draft.roomType === 'Phòng studio' ? '' : 'Phòng studio'
+    const next = { ...draft, roomType: nextRoomType }
+    setDraft(next)
+    commitFilters(next, 1)
+  }
+
+  const toggleLoftQuick = () => {
+    const currentAmenities = Array.isArray(draft.amenities) ? draft.amenities : []
+    const hasLoftAmenity = currentAmenities.includes('Gác lửng')
+    const hasLoftType = draft.roomType === 'Phòng có gác'
+    const isCurrentlyLoft = hasLoftAmenity || hasLoftType
+    const nextAmenities = isCurrentlyLoft
+      ? currentAmenities.filter((item) => item !== 'Gác lửng')
+      : [...currentAmenities, 'Gác lửng']
+    const nextRoomType = isCurrentlyLoft && hasLoftType ? '' : draft.roomType
+    const next = { ...draft, amenities: nextAmenities, roomType: nextRoomType }
+    setDraft(next)
+    commitFilters(next, 1)
   }
 
   const activeFilterCount = [
@@ -406,6 +438,61 @@ function PublicCatalogPage({ location, navigate }) {
 
   const isPricePreset = (min, max) =>
     urlState.filters.minPriceVnd === min && urlState.filters.maxPriceVnd === max
+  const isBalconyActive = (urlState.filters.amenities || []).includes('Ban công')
+  const isStudioActive = urlState.filters.roomType === 'Phòng studio'
+  const isLoftActive =
+    (urlState.filters.amenities || []).includes('Gác lửng') ||
+    urlState.filters.roomType === 'Phòng có gác'
+
+  const renderQuickChipGroups = (compact = false) => (
+    <div className={`quick-chips-stack${compact ? ' is-compact' : ''}`}>
+      <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng giá">
+        {!compact && <span className="quick-chip-label">Mức giá nhanh:</span>}
+        {QUICK_PRICE_PRESETS.map((preset) => {
+          const active = isPricePreset(preset.min, preset.max)
+          return (
+            <button
+              type="button"
+              key={preset.label}
+              className={`filter-chip${active ? ' is-active' : ''}`}
+              aria-pressed={active}
+              onClick={() => setQuickPrice(preset.min, preset.max)}
+            >
+              {preset.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="quick-feature-chips" role="group" aria-label="Lọc nhanh loại phòng và tiện nghi">
+        {!compact && <span className="quick-chip-label">Đặc điểm nhanh:</span>}
+        <button
+          type="button"
+          className={`filter-chip${isBalconyActive ? ' is-active' : ''}`}
+          aria-pressed={isBalconyActive}
+          onClick={() => toggleAmenity('Ban công', true)}
+        >
+          Có ban công
+        </button>
+        <button
+          type="button"
+          className={`filter-chip${isStudioActive ? ' is-active' : ''}`}
+          aria-pressed={isStudioActive}
+          onClick={toggleStudioQuick}
+        >
+          Phòng studio
+        </button>
+        <button
+          type="button"
+          className={`filter-chip${isLoftActive ? ' is-active' : ''}`}
+          aria-pressed={isLoftActive}
+          onClick={toggleLoftQuick}
+        >
+          Phòng gác
+        </button>
+      </div>
+    </div>
+  )
 
   const activeChips = []
   if (urlState.filters.q) activeChips.push({ key: 'q', label: `Từ khóa: "${urlState.filters.q}"` })
@@ -418,9 +505,10 @@ function PublicCatalogPage({ location, navigate }) {
     })
   }
   if (urlState.filters.minPriceVnd || urlState.filters.maxPriceVnd) {
-    const minText = urlState.filters.minPriceVnd ? `${(Number(urlState.filters.minPriceVnd) / 1000000).toLocaleString('vi-VN')} tr` : '0'
-    const maxText = urlState.filters.maxPriceVnd ? `${(Number(urlState.filters.maxPriceVnd) / 1000000).toLocaleString('vi-VN')} tr` : 'trở lên'
-    activeChips.push({ key: 'price', label: `Giá: ${minText} – ${maxText}` })
+    const minM = urlState.filters.minPriceVnd ? `${(Number(urlState.filters.minPriceVnd) / 1000000).toLocaleString('vi-VN')} tr` : ''
+    const maxM = urlState.filters.maxPriceVnd ? `${(Number(urlState.filters.maxPriceVnd) / 1000000).toLocaleString('vi-VN')} tr` : ''
+    const priceLabel = minM && maxM ? `Giá: ${minM} – ${maxM}` : minM ? `Giá: Trên ${minM}` : `Giá: Dưới ${maxM}`
+    activeChips.push({ key: 'price', label: priceLabel })
   }
   if (urlState.filters.minAreaM2 || urlState.filters.maxAreaM2) {
     const minA = urlState.filters.minAreaM2 || '0'
@@ -550,39 +638,7 @@ function PublicCatalogPage({ location, navigate }) {
             </div>
 
             <div className="filter-secondary-row">
-              <div className="quick-chips-stack">
-                <div className="quick-price-chips" role="group" aria-label="Chọn nhanh khoảng giá">
-                  <span className="quick-chip-label">Mức giá nhanh:</span>
-                  <button
-                    type="button"
-                    className={`filter-chip${isPricePreset('', '') ? ' is-active' : ''}`}
-                    onClick={() => setQuickPrice('', '')}
-                  >
-                    Tất cả
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-chip${isPricePreset('', '3500000') ? ' is-active' : ''}`}
-                    onClick={() => setQuickPrice('', '3500000')}
-                  >
-                    Dưới 3,5 triệu
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-chip${isPricePreset('3500000', '5000000') ? ' is-active' : ''}`}
-                    onClick={() => setQuickPrice('3500000', '5000000')}
-                  >
-                    3,5 – 5 triệu
-                  </button>
-                  <button
-                    type="button"
-                    className={`filter-chip${isPricePreset('5000000', '') ? ' is-active' : ''}`}
-                    onClick={() => setQuickPrice('5000000', '')}
-                  >
-                    Trên 5 triệu
-                  </button>
-                </div>
-              </div>
+              {renderQuickChipGroups(false)}
 
               {activeFilterCount > 0 && (
                 <button type="button" className="text-button" onClick={resetAllFilters}>
@@ -714,6 +770,7 @@ function PublicCatalogPage({ location, navigate }) {
                 Tìm
               </button>
             </div>
+            {renderQuickChipGroups(true)}
           </form>
 
           {/* Toolbar & Active Filters */}

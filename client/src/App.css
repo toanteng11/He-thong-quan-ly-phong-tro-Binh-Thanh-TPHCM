@@ -562,7 +562,8 @@ textarea:focus-visible {
   border-top: 1px solid var(--border-subtle);
 }
 
-.quick-price-chips {
+.quick-price-chips,
+.quick-feature-chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1638,6 +1639,7 @@ textarea:focus-visible {
     display: none;
   }
   .mobile-filter-bar {
+    min-width: 0;
     display: grid;
     gap: 8px;
     padding: 10px;
@@ -1645,6 +1647,7 @@ textarea:focus-visible {
     border: 1px solid var(--border-subtle);
     border-radius: 14px;
     box-shadow: var(--shadow-card);
+    overflow: hidden;
   }
   .mobile-filter-bar .filter-input-box {
     height: 40px;
@@ -1658,6 +1661,32 @@ textarea:focus-visible {
     min-height: 38px;
     padding: 0 12px;
     font-size: 13px;
+  }
+  .quick-chips-stack.is-compact {
+    min-width: 0;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .quick-chips-stack.is-compact .quick-price-chips,
+  .quick-chips-stack.is-compact .quick-feature-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    padding-bottom: 1px;
+  }
+  .quick-chips-stack.is-compact .quick-price-chips::-webkit-scrollbar,
+  .quick-chips-stack.is-compact .quick-feature-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .quick-chips-stack.is-compact .filter-chip {
+    min-height: 31px;
+    padding: 0 11px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .catalog-toolbar {
     margin: 12px 0 10px;

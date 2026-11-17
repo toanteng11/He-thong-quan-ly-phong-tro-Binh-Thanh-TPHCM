@@ -198,7 +198,20 @@ router.get("/rooms", async (request, response, next) => {
       match.roomType = filter.roomType;
     }
     if (filter.amenities.length > 0) {
-      match.amenities = { $all: filter.amenities };
+      const hasLoftFilter = filter.amenities.includes("Gác lửng");
+      const requiredAmenities = filter.amenities.filter((item) => item !== "Gác lửng");
+      if (requiredAmenities.length > 0) {
+        match.amenities = { $all: requiredAmenities };
+      }
+      if (hasLoftFilter) {
+        match.$and = match.$and || [];
+        match.$and.push({
+          $or: [
+            { amenities: "Gác lửng" },
+            { roomType: "Phòng có gác" },
+          ],
+        });
+      }
     }
     if (filter.minPriceVnd !== undefined || filter.maxPriceVnd !== undefined) {
       match.priceVnd = {};
