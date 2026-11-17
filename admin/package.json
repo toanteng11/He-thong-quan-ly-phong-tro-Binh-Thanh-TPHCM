@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "test:parser": "node scripts/verify-parser.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

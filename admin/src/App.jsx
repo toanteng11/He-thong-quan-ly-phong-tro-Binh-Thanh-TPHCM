@@ -2,20 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from './components/Icon.jsx'
 import { api } from './lib/api.js'
 import { branding } from './branding.js'
+import {
+  AMENITIES,
+  BINH_THANH_WARDS,
+  ROOM_TYPES,
+  getMissingImportFields,
+  parseRoomPostText,
+} from './lib/facebookPostParser.js'
 import './App.css'
-
-const ROOM_TYPES = ['Phòng trọ', 'Phòng có gác', 'Phòng studio', 'Căn hộ mini', 'Phòng ở ghép']
-const BINH_THANH_WARDS = [
-  'Phường Gia Định',
-  'Phường Bình Thạnh',
-  'Phường Bình Lợi Trung',
-  'Phường Thạnh Mỹ Tây',
-  'Phường Bình Quới',
-]
-const AMENITIES = [
-  'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
-  'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',
-]
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const ALLOWED_IMAGE_EXTS = /\.(jpe?g|png|webp)$/i
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -1220,6 +1214,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [savedSnapshot, setSavedSnapshot] = useState(() => (roomId ? '' : JSON.stringify(emptyListing)))
+  const [quickPostText, setQuickPostText] = useState('')
+  const [quickOverwrite, setQuickOverwrite] = useState(true)
+  const [quickPanelOpen, setQuickPanelOpen] = useState(!roomId)
+  const [quickImportResult, setQuickImportResult] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmHide, setConfirmHide] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -1228,6 +1226,13 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   const pendingUrlsRef = useRef(new Set())
 
   const isDirty = (savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot) || (!roomId && images.length > 0)
+  const missingQuickFields = quickImportResult ? getMissingImportFields(form) : []
+  const missingFieldKeys = new Set(missingQuickFields.map((item) => item.key))
+
+  useEffect(() => {
+    setQuickImportResult(null)
+    setQuickPanelOpen(!roomId)
+  }, [roomId])
 
   useEffect(() => {
     const urls = pendingUrlsRef.current
@@ -1286,6 +1291,85 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
     }
   }, [isDirty])
 
+  const focusField = (fieldId) => {
+    const el = document.getElementById(fieldId)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const control = el.querySelector('input, textarea, select')
+    if (control) {
+      window.setTimeout(() => control.focus({ preventScroll: true }), 180)
+    }
+  }
+
+  const pasteFromClipboard = async () => {
+    try {
+      if (!navigator.clipboard?.readText) {
+        showNotice('Trình duyệt không hỗ trợ nút dán nhanh — bạn hãy chạm vào ô và chọn Dán (Ctrl+V).', 'info')
+        return
+      }
+      const clipText = await navigator.clipboard.readText()
+      if (!clipText.trim()) {
+        showNotice('Bộ nhớ tạm hiện đang trống.', 'info')
+        return
+      }
+      setQuickPostText(clipText)
+      showNotice('Đã dán nội dung từ bộ nhớ tạm. Bấm "Tự động điền thông tin" để phân tích.')
+    } catch {
+      showNotice('Trình duyệt chưa cấp quyền đọc bộ nhớ tạm — bạn hãy chạm vào ô và chọn Dán (Ctrl+V).', 'info')
+    }
+  }
+
+  const applyQuickImport = () => {
+    if (!quickPostText.trim()) {
+      setError('Vui lòng dán nội dung bài đăng Facebook hoặc Zalo trước khi tự động điền.')
+      return
+    }
+    setError('')
+    setFieldErrors({})
+    const parsed = parseRoomPostText(quickPostText)
+    setForm((previous) => {
+      const next = { ...previous }
+      for (const [key, value] of Object.entries(parsed.fields)) {
+        if (key === 'amenities') {
+          next.amenities = quickOverwrite
+            ? value
+            : Array.from(new Set([...(previous.amenities || []), ...value]))
+          continue
+        }
+        if (key === 'allowExactAddress' || key === 'allowPublicPhone' || key === 'allowPublicZalo') {
+          if (quickOverwrite || !previous[key]) {
+            next[key] = value
+          }
+          continue
+        }
+        const prevEmpty = previous[key] === '' || previous[key] === null || previous[key] === undefined
+        if (quickOverwrite || prevEmpty) {
+          next[key] = value
+        }
+      }
+      return next
+    })
+    setQuickImportResult({
+      filledLabels: parsed.filledLabels,
+      removedNoise: parsed.removedNoise,
+      suggestions: parsed.suggestions,
+    })
+    if (parsed.missingFields.length > 0) {
+      showNotice(
+        `Đã tự động điền thông tin. Còn thiếu ${parsed.missingFields.length} mục — vui lòng nhập tay theo cảnh báo trên màn hình.`,
+        'info',
+      )
+    } else {
+      showNotice('Đã xóa rác và tự động điền đủ thông tin. Bạn có thể thêm ảnh và lưu bản nháp.')
+    }
+  }
+
+  const clearQuickImport = () => {
+    setQuickPostText('')
+    setQuickImportResult(null)
+    setError('')
+  }
+
   const update = (key, value) => {
     setForm((previous) => ({ ...previous, [key]: value }))
     setFieldErrors((previous) => {
@@ -1306,6 +1390,12 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
     )
 
   const save = async (quiet = false) => {
+    if (!roomId && quickImportResult && !quiet && missingQuickFields.length > 0) {
+      const missingText = missingQuickFields.map((item) => item.label).join(', ')
+      setError(`Còn thiếu thông tin bắt buộc (${missingText}). Vui lòng tự nhập tay vào các ô đánh dấu cam trước khi tạo bản nháp.`)
+      focusField(missingQuickFields[0].fieldId)
+      return null
+    }
     setBusy(true)
     setError('')
     setFieldErrors({})
@@ -1604,6 +1694,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
     )
 
   const fieldError = (key) => fieldErrors[key] && <small className="field-error">{fieldErrors[key]}</small>
+  const missingHint = (key) =>
+    missingFieldKeys.has(key) && !fieldErrors[key] ? (
+      <small className="field-missing-hint">Bài viết chưa có thông tin này — vui lòng tự nhập tay.</small>
+    ) : null
 
   if (loading) {
     return (
@@ -1652,6 +1746,29 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
         </div>
       )}
 
+      {quickImportResult && missingQuickFields.length > 0 && (
+        <div className="quick-import-missing-alert" role="alert">
+          <div className="quick-import-missing-head">
+            <strong>
+              Thiếu {missingQuickFields.length} thông tin cần bạn tự nhập tay trước khi tạo bản nháp:
+            </strong>
+            <span>Chạm vào từng mục để điền ngay</span>
+          </div>
+          <div className="quick-import-missing-chips">
+            {missingQuickFields.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className="missing-jump-chip"
+                onClick={() => focusField(item.fieldId)}
+              >
+                + {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {Object.keys(fieldErrors).length > 0 && (
         <div className="publish-checklist" role="alert">
           <strong>Chưa thể xuất bản tin này</strong>
@@ -1674,6 +1791,93 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
         }}
       >
         <div className="form-main-column">
+          {roomId && !quickPanelOpen ? (
+            <div className="quick-import-collapsed">
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                onClick={() => setQuickPanelOpen(true)}
+              >
+                <Icon name="sparkles" size={15} /> Nhập nhanh từ bài đăng Facebook / Zalo
+              </button>
+            </div>
+          ) : (
+            <section className="panel form-section quick-import-card" aria-label="Nhập nhanh từ bài đăng mạng xã hội">
+              <div className="section-heading quick-import-heading">
+                <span className="section-number quick-import-badge">
+                  <Icon name="sparkles" size={16} />
+                </span>
+                <div>
+                  <h2>Nhập nhanh từ bài đăng Facebook / Zalo</h2>
+                </div>
+                {roomId && (
+                  <button
+                    type="button"
+                    className="button button-quiet button-small"
+                    style={{ marginLeft: 'auto' }}
+                    onClick={() => setQuickPanelOpen(false)}
+                  >
+                    Thu gọn
+                  </button>
+                )}
+              </div>
+
+              <label className="field">
+                <textarea
+                  rows="5"
+                  value={quickPostText}
+                  onChange={(event) => setQuickPostText(event.target.value)}
+                  placeholder="Dán nguyên bài viết Facebook / Zalo vào đây (ví dụ: Chỉ 4tr2 ban công gần Quận 1, 18 Nguyễn Cửu Vân, Lh 0947832801...) — hệ thống tự xóa #hashtag, nhãn dán và điền thông tin."
+                />
+              </label>
+
+              <div className="quick-import-actions">
+                <button type="button" className="button button-primary button-small" onClick={applyQuickImport}>
+                  <Icon name="sparkles" size={15} /> Tự động điền thông tin
+                </button>
+                <button type="button" className="button button-secondary button-small" onClick={pasteFromClipboard}>
+                  Dán từ bộ nhớ tạm
+                </button>
+                {quickPostText && (
+                  <button type="button" className="button button-quiet button-small" onClick={clearQuickImport}>
+                    Xóa ô dán
+                  </button>
+                )}
+                <label className="quick-import-check">
+                  <input
+                    type="checkbox"
+                    checked={quickOverwrite}
+                    onChange={(event) => setQuickOverwrite(event.target.checked)}
+                  />
+                  <span>Ghi đè các ô đã nhập</span>
+                </label>
+              </div>
+
+              {quickImportResult && (
+                <div className="quick-import-summary">
+                  <p className="quick-import-done">
+                    <Icon name="check" size={15} />
+                    <span>
+                      Đã xóa <strong>{quickImportResult.removedNoise.hashtagsCount}</strong> hashtag &amp;{' '}
+                      <strong>{quickImportResult.removedNoise.emojisCount}</strong> nhãn dán/emoji · Đã tự điền:{' '}
+                      {quickImportResult.filledLabels.length ? quickImportResult.filledLabels.join(', ') : 'chưa khớp mục nào'}
+                    </span>
+                  </p>
+                  {quickImportResult.suggestions.map((note) => (
+                    <p className="quick-import-suggestion" key={note}>
+                      {note}
+                    </p>
+                  ))}
+                  {missingQuickFields.length === 0 && (
+                    <p className="quick-import-ready">
+                      Thông tin cơ bản đã đầy đủ — bạn có thể thêm ảnh phòng bên dưới rồi bấm Lưu bản nháp.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           <section className="panel form-section">
             <div className="section-heading">
               <span className="section-number">01</span>
@@ -1682,7 +1886,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               </div>
             </div>
             <div className="field-grid">
-              <label className="field field-span-2" id="field-title">
+              <label
+                className={`field field-span-2${missingFieldKeys.has('title') ? ' is-missing-import' : ''}`}
+                id="field-title"
+              >
                 <span>Tiêu đề tin <b>*</b></span>
                 <input
                   maxLength="120"
@@ -1691,9 +1898,13 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="Ví dụ: Phòng có gác, cửa sổ thoáng gần Hàng Xanh, Bình Thạnh"
                 />
                 {fieldError('title')}
+                {missingHint('title')}
               </label>
 
-              <label className="field field-span-2" id="field-description">
+              <label
+                className={`field field-span-2${missingFieldKeys.has('description') ? ' is-missing-import' : ''}`}
+                id="field-description"
+              >
                 <span>Mô tả chi tiết <b>*</b></span>
                 <textarea
                   rows="6"
@@ -1703,9 +1914,13 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="Mô tả không gian, ánh sáng, lối đi, giờ giấc và các lưu ý cho khách thuê…"
                 />
                 {fieldError('description')}
+                {missingHint('description')}
               </label>
 
-              <label className="field" id="field-roomType">
+              <label
+                className={`field${missingFieldKeys.has('roomType') ? ' is-missing-import' : ''}`}
+                id="field-roomType"
+              >
                 <span>Loại phòng <b>*</b></span>
                 <select value={form.roomType} onChange={(e) => update('roomType', e.target.value)}>
                   <option value="">Chọn loại phòng</option>
@@ -1714,6 +1929,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   ))}
                 </select>
                 {fieldError('roomType')}
+                {missingHint('roomType')}
               </label>
 
               <label className="field" id="field-availability">
@@ -1735,7 +1951,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               </div>
             </div>
             <div className="field-grid">
-              <label className="field" id="field-priceVnd">
+              <label
+                className={`field${missingFieldKeys.has('priceVnd') ? ' is-missing-import' : ''}`}
+                id="field-priceVnd"
+              >
                 <span>Giá thuê mỗi tháng <b>*</b></span>
                 <span className="unit-input">
                   <input
@@ -1749,9 +1968,13 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   <i>VND / tháng</i>
                 </span>
                 {fieldError('priceVnd')}
+                {missingHint('priceVnd')}
               </label>
 
-              <label className="field" id="field-areaM2">
+              <label
+                className={`field${missingFieldKeys.has('areaM2') ? ' is-missing-import' : ''}`}
+                id="field-areaM2"
+              >
                 <span>Diện tích <b>*</b></span>
                 <span className="unit-input">
                   <input
@@ -1765,6 +1988,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   <i>m²</i>
                 </span>
                 {fieldError('areaM2')}
+                {missingHint('areaM2')}
               </label>
             </div>
           </section>
@@ -1777,7 +2001,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               </div>
             </div>
             <div className="field-grid">
-              <label className="field field-span-2" id="field-publicAddress">
+              <label
+                className={`field field-span-2${missingFieldKeys.has('publicAddress') ? ' is-missing-import' : ''}`}
+                id="field-publicAddress"
+              >
                 <span>Khu vực khách sẽ thấy <b>*</b></span>
                 <input
                   value={form.publicAddress}
@@ -1785,9 +2012,13 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="Ví dụ: Gần cầu Điện Biên Phủ, đường Xô Viết Nghệ Tĩnh"
                 />
                 {fieldError('publicAddress')}
+                {missingHint('publicAddress')}
               </label>
 
-              <label className="field" id="field-ward">
+              <label
+                className={`field${missingFieldKeys.has('ward') ? ' is-missing-import' : ''}`}
+                id="field-ward"
+              >
                 <span>Phường <b>*</b></span>
                 <select value={form.ward} onChange={(e) => update('ward', e.target.value)}>
                   <option value="">Chọn phường (Bình Thạnh 2026)</option>
@@ -1799,6 +2030,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   ))}
                 </select>
                 {fieldError('ward')}
+                {missingHint('ward')}
               </label>
 
               <label className="field">
@@ -1962,7 +2194,10 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
               </div>
             </div>
             <div className="field-grid">
-              <label className="field" id="field-contactPhone">
+              <label
+                className={`field${missingFieldKeys.has('contactPhone') ? ' is-missing-import' : ''}`}
+                id="field-contactPhone"
+              >
                 <span>Số điện thoại</span>
                 <input
                   inputMode="tel"
@@ -1971,6 +2206,7 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                   placeholder="09xx xxx xxx"
                 />
                 {fieldError('contactPhone')}
+                {missingHint('contactPhone')}
                 <span className="check-row">
                   <input
                     type="checkbox"
