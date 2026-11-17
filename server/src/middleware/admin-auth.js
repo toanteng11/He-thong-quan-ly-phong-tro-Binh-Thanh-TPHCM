@@ -102,7 +102,7 @@ function requirePasswordUpdated(request, response, next) {
 
 function requireSameOrigin(request, response, next) {
   const origin = request.get("Origin");
-  if (!origin || origin !== env.ADMIN_ORIGIN) {
+  if (!origin || !env.ADMIN_ORIGINS.includes(origin)) {
     return response.status(403).json({
       error: {
         code: "ORIGIN_REJECTED",

@@ -23,9 +23,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use((request, response, next) => {
   const origin = request.get("Origin");
   const isAdminRoute = request.path.startsWith("/api/v1/admin");
-  const allowedOrigin = isAdminRoute
-    ? origin === env.ADMIN_ORIGIN
-    : origin === env.CLIENT_ORIGIN || origin === env.ADMIN_ORIGIN;
+  const allowedOrigin = Boolean(origin) && (
+    isAdminRoute
+      ? env.ADMIN_ORIGINS.includes(origin)
+      : env.CLIENT_ORIGINS.includes(origin) || env.ADMIN_ORIGINS.includes(origin)
+  );
 
   if (origin && allowedOrigin) {
     response.setHeader("Access-Control-Allow-Origin", origin);

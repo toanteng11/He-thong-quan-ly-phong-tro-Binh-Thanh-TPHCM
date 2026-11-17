@@ -20,12 +20,40 @@ const trustProxySchema = z.preprocess((val) => {
   return val;
 }, z.union([z.boolean(), z.number().int().min(0).max(10)]));
 
+const originListSchema = (defaultValue) =>
+  z.string().default(defaultValue).transform((raw, ctx) => {
+    const items = String(raw)
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!items.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "At least one origin URL is required." });
+      return z.NEVER;
+    }
+    const normalized = [];
+    for (const item of items) {
+      try {
+        const url = new URL(item);
+        if (!["http:", "https:"].includes(url.protocol)) {
+          throw new Error("Invalid protocol");
+        }
+        if (!normalized.includes(url.origin)) {
+          normalized.push(url.origin);
+        }
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Invalid origin URL: ${item}` });
+        return z.NEVER;
+      }
+    }
+    return normalized;
+  });
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().default("127.0.0.1"),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  CLIENT_ORIGIN: z.string().url().default("http://127.0.0.1:5173"),
-  ADMIN_ORIGIN: z.string().url().default("http://127.0.0.1:5174"),
+  CLIENT_ORIGIN: originListSchema("http://127.0.0.1:5173"),
+  ADMIN_ORIGIN: originListSchema("http://127.0.0.1:5174"),
   TRUST_PROXY: trustProxySchema,
   COOKIE_SECURE: optionalBool,
   COOKIE_SAMESITE: z.enum(["Strict", "Lax", "None"]).default("Strict"),
@@ -89,6 +117,10 @@ if (!parsed.success) {
 
 const env = {
   ...parsed.data,
+  CLIENT_ORIGIN: parsed.data.CLIENT_ORIGIN[0],
+  CLIENT_ORIGINS: parsed.data.CLIENT_ORIGIN,
+  ADMIN_ORIGIN: parsed.data.ADMIN_ORIGIN[0],
+  ADMIN_ORIGINS: parsed.data.ADMIN_ORIGIN,
   COOKIE_SECURE_EFFECTIVE: parsed.data.COOKIE_SECURE ?? parsed.data.NODE_ENV === "production",
 };
 
