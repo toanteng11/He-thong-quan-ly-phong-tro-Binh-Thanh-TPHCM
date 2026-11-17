@@ -384,35 +384,110 @@ function checkChatRateLimit(ipKey) {
 }
 
 function parseChatIntent(foldedMsg) {
+  let minBudget = null;
   let maxBudget = null;
-  const underMatch = foldedMsg.match(/(?:duoi|<=|tam|khoang|toi da|budget|gia)?\s*(\d{1,2})\s*(?:tr|trieu)\s*(\d{1,2})?/);
-  if (underMatch) {
-    const major = Number(underMatch[1]);
-    const dec = underMatch[2] ? (underMatch[2].length === 1 ? Number(underMatch[2]) * 100_000 : Number(underMatch[2]) * 10_000) : 0;
-    const val = major * 1_000_000 + dec;
-    if (val >= 1_000_000 && val <= 30_000_000) {
-      maxBudget = foldedMsg.includes("duoi") ? val : val + 500_000;
+
+  // Nhận diện giá: 3tr9, 3.5tr, 3,5 triệu, 4tr, 4.200.000, 3800k
+  const priceCandidates = [];
+  for (const m of foldedMsg.matchAll(/(\d{1,2})\s*(?:tr|trieu)(\d{1,3})(?![a-z0-9])/g)) {
+    const minor = m[2].length === 1 ? Number(m[2]) * 100_000 : m[2].length === 2 ? Number(m[2]) * 10_000 : Number(m[2]) * 1_000;
+    priceCandidates.push(Number(m[1]) * 1_000_000 + minor);
+  }
+  for (const m of foldedMsg.matchAll(/(\d{1,2}[.,]\d{1,2})\s*(?:tr|trieu|cu)(?![a-z0-9])/g)) {
+    priceCandidates.push(Math.round(parseFloat(m[1].replace(",", ".")) * 1_000_000));
+  }
+  for (const m of foldedMsg.matchAll(/(\d{1,2})\s*(?:tr|trieu|cu)(?![a-z0-9\s]*\d)/g)) {
+    priceCandidates.push(Number(m[1]) * 1_000_000);
+  }
+  for (const m of foldedMsg.matchAll(/(\d{1,2}[.,]\d{3}[.,]\d{3})\s*(?:d|vnd)?(?![a-z0-9])/g)) {
+    priceCandidates.push(Number(m[1].replace(/[.,]/g, "")));
+  }
+  for (const m of foldedMsg.matchAll(/(\d{3,4})\s*k(?![a-z0-9])/g)) {
+    priceCandidates.push(Number(m[1]) * 1_000);
+  }
+
+  const validPrices = priceCandidates.filter((v) => v >= 500_000 && v <= 50_000_000);
+  if (validPrices.length >= 2 && (foldedMsg.includes("-") || foldedMsg.includes("den") || foldedMsg.includes("toi"))) {
+    minBudget = Math.min(validPrices[0], validPrices[1]);
+    maxBudget = Math.max(validPrices[0], validPrices[1]);
+  } else if (validPrices.length >= 1) {
+    const val = validPrices[0];
+    if (/(?:duoi|<=|<|nho hon|toi da|khong qua)/.test(foldedMsg)) {
+      maxBudget = val;
+    } else if (/(?:tren|>=|>|tu\s+\d)/.test(foldedMsg)) {
+      minBudget = val;
+    } else {
+      minBudget = Math.max(0, val - 600_000);
+      maxBudget = val + 500_000;
     }
   }
 
   let targetWard = "";
-  if (foldedMsg.includes("gia dinh") || foldedMsg.includes("ba chieu") || foldedMsg.includes("nguyen cuu van")) {
+  if (foldedMsg.includes("gia dinh") || foldedMsg.includes("ba chieu") || foldedMsg.includes("nguyen cuu van") || foldedMsg.includes("vu tung")) {
     targetWard = "Phường Gia Định";
-  } else if (foldedMsg.includes("thanh my tay") || foldedMsg.includes("hang xanh") || foldedMsg.includes("hutech") || foldedMsg.includes("ngoai thuong") || foldedMsg.includes("landmark")) {
+  } else if (
+    foldedMsg.includes("thanh my tay") ||
+    foldedMsg.includes("hang xanh") ||
+    foldedMsg.includes("hutech") ||
+    foldedMsg.includes("ngoai thuong") ||
+    foldedMsg.includes("landmark") ||
+    foldedMsg.includes("ung van khiem") ||
+    foldedMsg.includes("nguyen gia tri") ||
+    foldedMsg.includes("vo oanh")
+  ) {
     targetWard = "Phường Thạnh Mỹ Tây";
   } else if (foldedMsg.includes("binh loi trung") || foldedMsg.includes("van lang") || foldedMsg.includes("binh loi")) {
     targetWard = "Phường Bình Lợi Trung";
   } else if (foldedMsg.includes("binh quoi") || foldedMsg.includes("thanh da")) {
     targetWard = "Phường Bình Quới";
-  } else if (foldedMsg.includes("dinh bo linh") || foldedMsg.includes("nguyen xi") || foldedMsg.includes("bx mien dong") || foldedMsg.includes("chu van an") || /phuong\s*binh thanh/.test(foldedMsg)) {
+  } else if (
+    foldedMsg.includes("dinh bo linh") ||
+    foldedMsg.includes("nguyen xi") ||
+    foldedMsg.includes("bui dinh tuy") ||
+    foldedMsg.includes("bx mien dong") ||
+    foldedMsg.includes("hoc vien can bo") ||
+    foldedMsg.includes("chu van an") ||
+    /phuong\s*binh thanh/.test(foldedMsg)
+  ) {
     targetWard = "Phường Bình Thạnh";
   }
+
+  // Các cụm địa điểm / tên đường cụ thể khách hay nhắc
+  const locationKeywords = [
+    "ung van khiem",
+    "uvk",
+    "bui dinh tuy",
+    "xo viet nghe tinh",
+    "dinh bo linh",
+    "nguyen xi",
+    "bach dang",
+    "chu van an",
+    "nguyen cuu van",
+    "hang xanh",
+    "hutech",
+    "ngoai thuong",
+    "uth",
+    "gtvt",
+    "van lang",
+    "hoc vien can bo",
+    "thanh da",
+    "binh quoi",
+    "no trang long",
+    "le quang dinh",
+    "phan van tri",
+    "dien bien phu",
+    "phan dang luu",
+    "quan 1",
+    "q1",
+  ].filter((kw) => foldedMsg.includes(kw));
 
   const amenityHints = AMENITIES.filter((item) => {
     const f = foldVi(item);
     if (f === "ban cong" && (foldedMsg.includes("ban cong") || foldedMsg.includes("bancol"))) return true;
     if (f === "nha ve sinh rieng" && (foldedMsg.includes("wc") || foldedMsg.includes("ve sinh"))) return true;
-    if (f === "cho de xe" && (foldedMsg.includes("xe") || foldedMsg.includes("nha xe"))) return true;
+    if (f === "cho de xe" && (foldedMsg.includes("cho de xe") || foldedMsg.includes("nha xe") || foldedMsg.includes("bai xe"))) return true;
+    if (f === "bep rieng" && (foldedMsg.includes("bep") || foldedMsg.includes("nau an"))) return true;
+    if ((f === "giuong" || f === "tu quan ao") && (foldedMsg.includes("noi that") || foldedMsg.includes("full nt"))) return true;
     return foldedMsg.includes(f);
   });
 
@@ -422,48 +497,145 @@ function parseChatIntent(foldedMsg) {
   else if (foldedMsg.includes("o ghep")) roomTypeHint = "Phòng ở ghép";
   else if (foldedMsg.includes("gac")) roomTypeHint = "Phòng có gác";
 
-  return { maxBudget, targetWard, amenityHints, roomTypeHint };
+  const featureKeywords = [];
+  if (foldedMsg.includes("khong chung chu") || foldedMsg.includes("ko chung chu")) featureKeywords.push("khong chung chu");
+  if (foldedMsg.includes("van tay")) featureKeywords.push("van tay");
+  if (foldedMsg.includes("tu do")) featureKeywords.push("tu do");
+  if (foldedMsg.includes("thu cung") || foldedMsg.includes("nuoi meo") || foldedMsg.includes("nuoi cho") || foldedMsg.includes("pet")) {
+    featureKeywords.push("thu cung");
+  }
+
+  return {
+    minBudget,
+    maxBudget,
+    targetWard,
+    locationKeywords,
+    amenityHints,
+    roomTypeHint,
+    featureKeywords,
+    preferCheap: /(?:re nhat|gia re|thap nhat|tiet kiem)/.test(foldedMsg),
+    preferLarge: /(?:rong nhat|lon nhat)/.test(foldedMsg),
+  };
 }
 
-function rankRoomsForChat(docs, message) {
+function evaluateRoomsForChat(docs, message) {
   const foldedMsg = foldVi(message);
   const intent = parseChatIntent(foldedMsg);
-  const tokens = foldedMsg
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length >= 2 && !["phong", "tro", "binh", "thanh", "cho", "hoi", "tim", "can", "thue", "co", "khong", "nao", "bao", "nhieu", "gan", "khu", "vuc", "gia"].includes(w));
+  const available = docs.filter((d) => d.availability === "AVAILABLE");
 
-  const scored = docs.map((doc) => {
-    let score = doc.availability === "AVAILABLE" ? 50 : -100;
+  const hasExplicitCriteria = Boolean(
+    intent.minBudget ||
+      intent.maxBudget ||
+      intent.targetWard ||
+      intent.locationKeywords.length ||
+      intent.amenityHints.length ||
+      intent.roomTypeHint ||
+      intent.featureKeywords.length,
+  );
+
+  const evaluated = available.map((doc) => {
     const price = Number(doc.priceVnd || 0);
-    const haystack = foldVi(`${doc.title} ${doc.publicAddress} ${doc.ward} ${doc.roomType} ${(doc.amenities || []).join(" ")} ${doc.description}`);
+    const area = Number(doc.areaM2 || 0);
+    const locText = foldVi(`${doc.title} ${doc.publicAddress} ${doc.ward}`);
+    const fullText = foldVi(`${doc.title} ${doc.publicAddress} ${doc.ward} ${doc.roomType} ${(doc.amenities || []).join(" ")} ${doc.description}`);
 
-    if (intent.maxBudget && price > 0) {
-      if (price <= intent.maxBudget) score += 25;
-      else score -= 30;
+    let matchedCount = 0;
+    let failedCount = 0;
+    let score = 0;
+
+    if (intent.maxBudget !== null) {
+      if (price > 0 && price <= intent.maxBudget) {
+        matchedCount += 1;
+        score += 30;
+      } else {
+        failedCount += 1;
+        score -= 40;
+      }
     }
-    if (intent.targetWard && doc.ward === intent.targetWard) {
-      score += 30;
+    if (intent.minBudget !== null) {
+      if (price > 0 && price >= intent.minBudget) {
+        matchedCount += 1;
+        score += 20;
+      } else {
+        failedCount += 1;
+        score -= 35;
+      }
     }
-    if (intent.roomTypeHint && doc.roomType === intent.roomTypeHint) {
-      score += 20;
+    if (intent.locationKeywords.length) {
+      const locMatched = intent.locationKeywords.some((kw) => fullText.includes(kw));
+      if (locMatched) {
+        matchedCount += 1;
+        score += 40;
+      } else {
+        failedCount += 1;
+        score += intent.targetWard && doc.ward === intent.targetWard ? -10 : -35;
+      }
+    } else if (intent.targetWard) {
+      if (doc.ward === intent.targetWard || locText.includes(foldVi(intent.targetWard))) {
+        matchedCount += 1;
+        score += 30;
+      } else {
+        failedCount += 1;
+        score -= 30;
+      }
     }
+
+    if (intent.roomTypeHint) {
+      const hasGac = doc.roomType === "Phòng có gác" || (doc.amenities || []).includes("Gác lửng") || fullText.includes("gac");
+      const matchedType = intent.roomTypeHint === "Phòng có gác" ? hasGac : doc.roomType === intent.roomTypeHint;
+      if (matchedType) {
+        matchedCount += 1;
+        score += 25;
+      } else {
+        failedCount += 1;
+        score -= 30;
+      }
+    }
+
     for (const am of intent.amenityHints) {
-      if ((doc.amenities || []).includes(am)) score += 12;
+      if ((doc.amenities || []).includes(am)) {
+        matchedCount += 1;
+        score += 18;
+      } else {
+        failedCount += 1;
+        score -= 22;
+      }
     }
-    for (const tok of tokens) {
-      if (haystack.includes(tok)) score += 6;
+
+    for (const fk of intent.featureKeywords) {
+      if (fullText.includes(fk)) {
+        matchedCount += 1;
+        score += 18;
+      } else {
+        failedCount += 1;
+        score -= 20;
+      }
     }
-    if (foldedMsg.includes("re nhat") && price > 0) {
+
+    if (intent.preferCheap && price > 0) {
       score += Math.max(0, 20 - Math.round(price / 500_000));
     }
-    return { doc, score };
+    if (intent.preferLarge && area > 0) {
+      score += Math.min(20, Math.round(area / 2));
+    }
+
+    return { doc, matchedCount, failedCount, score };
   });
 
-  scored.sort((a, b) => b.score - a.score);
-  return { scored, intent };
+  evaluated.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (intent.preferCheap) return Number(a.doc.priceVnd || 0) - Number(b.doc.priceVnd || 0);
+    if (intent.preferLarge) return Number(b.doc.areaM2 || 0) - Number(a.doc.areaM2 || 0);
+    return new Date(b.doc.publishedAt || 0).getTime() - new Date(a.doc.publishedAt || 0).getTime();
+  });
+
+  const exactMatches = evaluated.filter((item) => item.failedCount === 0 && (!hasExplicitCriteria || item.matchedCount > 0));
+  const closestMatches = evaluated.filter((item) => item.matchedCount > 0);
+
+  return { intent, hasExplicitCriteria, evaluated, exactMatches, closestMatches, availableCount: available.length };
 }
 
-function buildFallbackReply(docs, ranked, message) {
+function buildFallbackReply(docs, evaluation, message) {
   const availableDocs = docs.filter((d) => d.availability === "AVAILABLE");
   if (!availableDocs.length) {
     return {
@@ -473,33 +645,103 @@ function buildFallbackReply(docs, ranked, message) {
   }
 
   const folded = foldVi(message);
-  const isGreetingOnly = /^(?:hi|hello|alo|chao|xin chao|bot oi|ad oi|tu van|help)[!.,\s]*$/.test(folded);
-  const topMatched = ranked.scored
-    .filter((item) => item.doc.availability === "AVAILABLE")
-    .slice(0, 3)
-    .map((item) => item.doc);
+  const isGreetingOnly = /^(?:hi|hello|alo|chao|xin chao|bot oi|ad oi|tu van|help|cam on|thank)[!.,\s]*$/.test(folded);
+  const isContactQuestion = /(?:lien he|sdt|so dien thoai|zalo|xem phong|dat lich|dia chi)/.test(folded) && !evaluation.hasExplicitCriteria;
 
   if (isGreetingOnly) {
-    const minPrice = Math.min(...availableDocs.map((d) => Number(d.priceVnd || 0)).filter(Boolean));
-    const priceText = minPrice ? `từ ${(minPrice / 1_000_000).toLocaleString("vi-VN")} triệu/tháng` : "giá hợp lý";
+    const prices = availableDocs.map((d) => Number(d.priceVnd || 0)).filter(Boolean);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const featured = evaluation.evaluated.slice(0, 3).map((item) => item.doc);
     return {
-      reply: `Chào bạn nè! Mình là Bot tư vấn của Phòng trọ Ngọc Toàn. Hiện bên mình đang có ${availableDocs.length} phòng trống tại Bình Thạnh (${priceText}). Bạn muốn tìm phòng tầm giá nào hay gần khu vực nào để mình lọc giúp nhé!`,
-      rooms: topMatched.map(toPublicListItem),
+      reply: `Chào bạn nè! Mình là Bot tư vấn của Phòng trọ Ngọc Toàn. Hiện bên mình đang có ${availableDocs.length} phòng trống tại Bình Thạnh (giá từ ${(minP / 1_000_000).toLocaleString("vi-VN")} – ${(maxP / 1_000_000).toLocaleString("vi-VN")} triệu/tháng). Bạn thích tầm giá nào hay gần khu vực nào cứ nhắn mình lọc giúp nha!`,
+      rooms: featured.map(toPublicListItem),
     };
   }
 
-  const hasExactHit = ranked.scored.some((item) => item.doc.availability === "AVAILABLE" && item.score > 60);
-  if (hasExactHit) {
+  if (isContactQuestion) {
+    const contactDoc = availableDocs.find((d) => (d.allowPublicPhone && d.contactPhone) || (d.allowPublicZalo && d.contactZalo));
+    const contactInfo = contactDoc
+      ? [
+          contactDoc.allowPublicPhone && contactDoc.contactPhone ? `SĐT: ${contactDoc.contactPhone}` : "",
+          contactDoc.allowPublicZalo && contactDoc.contactZalo ? `Zalo: ${contactDoc.contactZalo}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "";
     return {
-      reply: `Mình tìm thấy ${topMatched.length} phòng còn trống khá hợp với nhu cầu của bạn nè! Bạn bấm trực tiếp vào thẻ phòng bên dưới để xem hình thật và gọi/nhắn Zalo xem phòng nha.`,
-      rooms: topMatched.map(toPublicListItem),
+      reply: contactInfo
+        ? `Để đặt lịch xem phòng nhanh nhất, bạn có thể liên hệ trực tiếp chủ trọ qua ${contactInfo}, hoặc bấm vào từng phòng để nhấn nút Gọi / Nhắn Zalo nhé!`
+        : "Bạn hãy bấm vào căn phòng bạn thích rồi nhấn nút Gọi điện hoặc Nhắn Zalo để hẹn giờ xem phòng trực tiếp nha!",
+      rooms: [],
+    };
+  }
+
+  if (evaluation.exactMatches.length > 0) {
+    const picks = evaluation.exactMatches.slice(0, 3).map((item) => item.doc);
+    const summaryLines = picks.map(
+      (r) => `• ${r.title} (${(Number(r.priceVnd || 0) / 1_000_000).toLocaleString("vi-VN")}tr · ${r.areaM2}m² · ${r.ward})`,
+    );
+    return {
+      reply: `Bot tư vấn tìm thấy ${evaluation.exactMatches.length} phòng còn trống khớp đúng yêu cầu của bạn nè:\n${summaryLines.join("\n")}\nBạn chạm vào thẻ phòng bên dưới để xem hình thật & gọi/nhắn Zalo nhé!`,
+      rooms: picks.map(toPublicListItem),
+    };
+  }
+
+  if (evaluation.closestMatches.length > 0) {
+    const picks = evaluation.closestMatches.slice(0, 2).map((item) => item.doc);
+    return {
+      reply: "Hic, hiện chưa có phòng nào khớp trọn vẹn 100% các tiêu chí bạn cần ạ. Mình gợi ý 2 căn gần nhất đang còn trống để bạn tham khảo thử nha:",
+      rooms: picks.map(toPublicListItem),
     };
   }
 
   return {
-    reply: `Hiện chưa có phòng khớp 100% tiêu chí đó, nhưng bên mình vẫn còn ${availableDocs.length} phòng trống rất đẹp ở Bình Thạnh nè! Bạn tham khảo thử các căn gần nhất bên dưới nhé:`,
-    rooms: topMatched.map(toPublicListItem),
+    reply: `Hiện chưa có phòng nào phù hợp tiêu chí này trong ${availableDocs.length} phòng trống của bên mình ạ. Bạn thử nói rõ hơn tầm giá (vd: dưới 4tr) hoặc khu vực ở Bình Thạnh giúp Bot tư vấn nhé!`,
+    rooms: [],
   };
+}
+
+function buildGeminiConfig(systemText) {
+  const generationConfig = {
+    temperature: 0.35,
+    maxOutputTokens: 500,
+    responseMimeType: "application/json",
+    responseSchema: {
+      type: "OBJECT",
+      properties: {
+        reply: { type: "STRING" },
+        recommendedRoomIds: {
+          type: "ARRAY",
+          items: { type: "STRING" },
+        },
+      },
+      required: ["reply", "recommendedRoomIds"],
+    },
+  };
+  if (String(env.GEMINI_MODEL || "").includes("2.5")) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
+  return { systemText, generationConfig };
+}
+
+async function callGeminiModel({ model, systemText, contents, generationConfig }) {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemText }] },
+        contents,
+        generationConfig,
+      }),
+      signal: AbortSignal.timeout(12000),
+    },
+  );
 }
 
 router.post("/chat", async (request, response, next) => {
@@ -550,44 +792,42 @@ router.post("/chat", async (request, response, next) => {
         },
       )
       .sort({ availability: 1, publishedAt: -1 })
-      .limit(24)
+      .limit(100)
       .toArray();
 
-    const ranked = rankRoomsForChat(docs, parsed.data.message);
-    const availableTop = ranked.scored
-      .filter((entry) => entry.doc.availability === "AVAILABLE")
-      .slice(0, 3)
-      .map((entry) => entry.doc);
+    const evaluation = evaluateRoomsForChat(docs, parsed.data.message);
 
     if (!env.GEMINI_API_KEY) {
-      const fb = buildFallbackReply(docs, ranked, parsed.data.message);
+      const fb = buildFallbackReply(docs, evaluation, parsed.data.message);
       return response.json({ ...fb, mode: "smart-fallback" });
     }
 
-    const groundedCatalog = docs
-      .filter((d) => d.availability === "AVAILABLE")
-      .slice(0, 12)
-      .map((d) => ({
-        id: d._id,
-        tieuDe: d.title,
-        loaiPhong: d.roomType,
-        giaVnd: d.priceVnd,
-        dienTichM2: d.areaM2,
-        khuVuc: d.publicAddress,
-        phuong: d.ward,
-        tienNghi: d.amenities || [],
-        sdtLienHe: d.allowPublicPhone && d.contactPhone ? d.contactPhone : null,
-        zaloLienHe: d.allowPublicZalo && d.contactZalo ? d.contactZalo : null,
-      }));
+    const availableDocs = docs.filter((d) => d.availability === "AVAILABLE");
+    const availableById = new Map(availableDocs.map((d) => [d._id, d]));
+
+    const groundedCatalog = availableDocs.slice(0, 40).map((d) => ({
+      id: d._id,
+      tieuDe: d.title,
+      loaiPhong: d.roomType,
+      giaVnd: d.priceVnd,
+      dienTichM2: d.areaM2,
+      khuVuc: d.publicAddress,
+      phuong: d.ward,
+      tienNghi: d.amenities || [],
+      moTaNgan: String(d.description || "").replace(/\s+/g, " ").trim().slice(0, 140),
+      sdtLienHe: d.allowPublicPhone && d.contactPhone ? d.contactPhone : null,
+      zaloLienHe: d.allowPublicZalo && d.contactZalo ? d.contactZalo : null,
+    }));
 
     const systemText = [
-      'Bạn tên là "Bot tư vấn", trợ lý AI thân thiện, dễ thương (cute vừa phải, lễ phép, dùng tiếng Việt tự nhiên) của website Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
-      "QUY TẮC BẮT BUỘC:",
-      "1. CHỈ được tư vấn dựa trên danh sách PHÒNG CÒN TRỐNG THẬT trong JSON bên dưới. Tuyệt đối KHÔNG tự bịa phòng, giá tiền, diện tích, địa chỉ hay số điện thoại không có trong dữ liệu.",
-      "2. Không nêu địa chỉ số nhà cụ thể, chỉ nói khu vực và phường được cung cấp.",
-      "3. Trả lời ngắn gọn (tối đa 4-5 câu), dễ đọc trên điện thoại. Nếu có phòng phù hợp, hãy nhắc nhẹ tên phòng, giá và mời khách bấm vào thẻ phòng ngay bên dưới để xem hình thật & gọi/nhắn Zalo.",
-      "4. Nếu chưa có phòng khớp hoàn toàn, hãy xin lỗi dễ thương, gợi ý các lựa chọn còn trống gần nhất và hướng dẫn khách nhắn Zalo nếu có.",
-      `DỮ LIỆU PHÒNG CÒN TRỐNG HIỆN TẠI (${groundedCatalog.length} phòng):`,
+      'Bạn tên là "Bot tư vấn", trợ lý AI thông minh, dễ thương, lịch sự của hệ thống Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
+      "NHIỆM VỤ: Đọc kỹ câu hỏi của khách, đối chiếu chính xác với JSON phòng còn trống bên dưới và trả về đúng định dạng JSON { reply, recommendedRoomIds }.",
+      "QUY TẮC NGHIÊM NGẶT:",
+      "1. CHỈ được đưa vào `recommendedRoomIds` tối đa 3 ID phòng THẬT SỰ KHỚP với yêu cầu về giá, khu vực/đường, loại phòng và tiện nghi của khách. Tuyệt đối KHÔNG nhét phòng không khớp (sai tầm giá hoặc thiếu tiện nghi bắt buộc khách hỏi) vào `recommendedRoomIds`.",
+      "2. Nếu KHÔNG có phòng nào khớp tiêu chí khách hỏi (ví dụ khách hỏi quá rẻ hoặc hỏi tiện nghi không có), hãy để `recommendedRoomIds: []` (hoặc tối đa 1 phòng sát nhất nếu thực sự gần), thành thật báo chưa có phòng khớp và gợi ý mức giá/khu vực gần nhất đang có.",
+      "3. KHÔNG được tự bịa phòng, giá, diện tích, địa chỉ số nhà cụ thể hay SĐT không có trong dữ liệu.",
+      "4. Câu trả lời `reply` tự nhiên, thân thiện, ngắn gọn (2-5 câu), nêu đúng tên/giá của các phòng bạn đã chọn trong `recommendedRoomIds`.",
+      `DANH SÁCH PHÒNG CÒN TRỐNG THẬT (${groundedCatalog.length} phòng):`,
       JSON.stringify(groundedCatalog),
     ].join("\n");
 
@@ -600,49 +840,81 @@ router.post("/chat", async (request, response, next) => {
     ];
 
     try {
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL)}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemText }] },
-            contents,
-            generationConfig: {
-              temperature: 0.5,
-              maxOutputTokens: 320,
-            },
-          }),
-          signal: AbortSignal.timeout(8000),
-        },
-      );
+      const { generationConfig } = buildGeminiConfig(systemText);
+      let geminiRes = await callGeminiModel({
+        model: env.GEMINI_MODEL,
+        systemText,
+        contents,
+        generationConfig,
+      });
+
+      if ((geminiRes.status === 400 || geminiRes.status === 404) && env.GEMINI_MODEL !== "gemini-2.0-flash") {
+        const fallbackConfig = { ...generationConfig };
+        delete fallbackConfig.thinkingConfig;
+        geminiRes = await callGeminiModel({
+          model: "gemini-2.0-flash",
+          systemText,
+          contents,
+          generationConfig: fallbackConfig,
+        });
+      }
 
       if (geminiRes.ok) {
         const geminiJson = await geminiRes.json();
-        const aiText = geminiJson?.candidates?.[0]?.content?.parts
+        const rawText = geminiJson?.candidates?.[0]?.content?.parts
           ?.map((part) => part?.text || "")
           .join("")
           .trim();
-        if (aiText) {
+        if (rawText) {
+          let parsedAi = null;
+          try {
+            parsedAi = JSON.parse(rawText);
+          } catch {
+            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                parsedAi = JSON.parse(jsonMatch[0]);
+              } catch {
+                parsedAi = null;
+              }
+            }
+          }
+
+          if (parsedAi && typeof parsedAi.reply === "string" && parsedAi.reply.trim()) {
+            const pickedRooms = Array.isArray(parsedAi.recommendedRoomIds)
+              ? [...new Set(parsedAi.recommendedRoomIds)]
+                  .map((id) => availableById.get(id))
+                  .filter(Boolean)
+                  .slice(0, 3)
+              : [];
+            return response.json({
+              reply: parsedAi.reply.trim(),
+              rooms: pickedRooms.map(toPublicListItem),
+              mode: "gemini",
+            });
+          }
+
           return response.json({
-            reply: aiText,
-            rooms: availableTop.map(toPublicListItem),
+            reply: rawText,
+            rooms: evaluation.exactMatches.slice(0, 3).map((e) => toPublicListItem(e.doc)),
             mode: "gemini",
           });
         }
+      } else {
+        console.warn(JSON.stringify({ event: "gemini_chat_non_ok", status: geminiRes.status, requestId: request.requestId }));
       }
-    } catch {
-      // Fallback sang trả lời thông minh từ MongoDB nếu Gemini lỗi hoặc hết quota
+    } catch (geminiError) {
+      console.warn(JSON.stringify({ event: "gemini_chat_exception", errorName: geminiError?.name || "Error", requestId: request.requestId }));
     }
 
-    const fb = buildFallbackReply(docs, ranked, parsed.data.message);
+    const fb = buildFallbackReply(docs, evaluation, parsed.data.message);
     return response.json({ ...fb, mode: "smart-fallback" });
   } catch (error) {
     return next(error);
   }
 });
 
-module.exports = { publicRouter: router };
+module.exports = {
+  publicRouter: router,
+  __testHelpers: { parseChatIntent, evaluateRoomsForChat, buildFallbackReply },
+};
