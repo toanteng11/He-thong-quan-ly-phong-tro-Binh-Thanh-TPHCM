@@ -654,7 +654,7 @@ function buildFallbackReply(docs, evaluation, message) {
     const maxP = Math.max(...prices);
     const featured = evaluation.evaluated.slice(0, 3).map((item) => item.doc);
     return {
-      reply: `Chào bạn nè! Mình là Bot tư vấn của Phòng trọ Ngọc Toàn. Hiện bên mình đang có ${availableDocs.length} phòng trống tại Bình Thạnh (giá từ ${(minP / 1_000_000).toLocaleString("vi-VN")} – ${(maxP / 1_000_000).toLocaleString("vi-VN")} triệu/tháng). Bạn thích tầm giá nào hay gần khu vực nào cứ nhắn mình lọc giúp nha!`,
+      reply: `Chào bạn nè! Mình là Bé Toàn AI của Phòng trọ Ngọc Toàn. Hiện bên mình đang có ${availableDocs.length} phòng trống tại Bình Thạnh (giá từ ${(minP / 1_000_000).toLocaleString("vi-VN")} – ${(maxP / 1_000_000).toLocaleString("vi-VN")} triệu/tháng). Bạn thích tầm giá nào hay gần khu vực nào cứ nhắn mình lọc giúp nha!`,
       rooms: featured.map(toPublicListItem),
     };
   }
@@ -683,7 +683,7 @@ function buildFallbackReply(docs, evaluation, message) {
       (r) => `• ${r.title} (${(Number(r.priceVnd || 0) / 1_000_000).toLocaleString("vi-VN")}tr · ${r.areaM2}m² · ${r.ward})`,
     );
     return {
-      reply: `Bot tư vấn tìm thấy ${evaluation.exactMatches.length} phòng còn trống khớp đúng yêu cầu của bạn nè:\n${summaryLines.join("\n")}\nBạn chạm vào thẻ phòng bên dưới để xem hình thật & gọi/nhắn Zalo nhé!`,
+      reply: `Bé Toàn AI tìm thấy ${evaluation.exactMatches.length} phòng còn trống khớp đúng yêu cầu của bạn nè:\n${summaryLines.join("\n")}\nBạn chạm vào thẻ phòng bên dưới để xem hình thật & gọi/nhắn Zalo nhé!`,
       rooms: picks.map(toPublicListItem),
     };
   }
@@ -697,7 +697,7 @@ function buildFallbackReply(docs, evaluation, message) {
   }
 
   return {
-    reply: `Hiện chưa có phòng nào phù hợp tiêu chí này trong ${availableDocs.length} phòng trống của bên mình ạ. Bạn thử nói rõ hơn tầm giá (vd: dưới 4tr) hoặc khu vực ở Bình Thạnh giúp Bot tư vấn nhé!`,
+    reply: `Hiện chưa có phòng nào phù hợp tiêu chí này trong ${availableDocs.length} phòng trống của bên mình ạ. Bạn thử nói rõ hơn tầm giá (vd: dưới 4tr) hoặc khu vực ở Bình Thạnh giúp Bé Toàn AI nhé!`,
     rooms: [],
   };
 }
@@ -753,7 +753,7 @@ router.post("/chat", async (request, response, next) => {
       request,
       429,
       "CHAT_RATE_LIMITED",
-      "Bạn nhắn hơi nhanh rồi, nghỉ tay vài giây rồi hỏi lại Bot tư vấn nhé!",
+      "Bạn nhắn hơi nhanh rồi, nghỉ tay vài giây rồi hỏi lại Bé Toàn AI nhé!",
     );
   }
 
@@ -820,7 +820,7 @@ router.post("/chat", async (request, response, next) => {
     }));
 
     const systemText = [
-      'Bạn tên là "Bot tư vấn", trợ lý AI thông minh, dễ thương, lịch sự của hệ thống Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
+      'Bạn tên là "Bé Toàn AI", trợ lý AI thông minh, dễ thương, lịch sự của hệ thống Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
       "NHIỆM VỤ: Đọc kỹ câu hỏi của khách, đối chiếu chính xác với JSON phòng còn trống bên dưới và trả về đúng định dạng JSON { reply, recommendedRoomIds }.",
       "QUY TẮC NGHIÊM NGẶT:",
       "1. CHỈ được đưa vào `recommendedRoomIds` tối đa 3 ID phòng THẬT SỰ KHỚP với yêu cầu về giá, khu vực/đường, loại phòng và tiện nghi của khách. Tuyệt đối KHÔNG nhét phòng không khớp (sai tầm giá hoặc thiếu tiện nghi bắt buộc khách hỏi) vào `recommendedRoomIds`.",

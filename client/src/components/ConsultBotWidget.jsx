@@ -4,8 +4,8 @@ import { api } from '../lib/api.js'
 const QUICK_PROMPTS = [
   'Phòng dưới 4 triệu',
   'Phòng có gác',
-  'Gần Hàng Xanh',
-  'Có ban công, cửa sổ',
+  'Gần Hutech / Hàng Xanh',
+  'Đường Bùi Đình Túy',
 ]
 
 function formatPriceVnd(value) {
@@ -13,7 +13,7 @@ function formatPriceVnd(value) {
   return `${Number(value).toLocaleString('vi-VN')} ₫`
 }
 
-function BotMascot({ size = 34 }) {
+function BeToanMascot({ size = 38 }) {
   return (
     <svg
       width={size}
@@ -23,26 +23,71 @@ function BotMascot({ size = 34 }) {
       aria-hidden="true"
       className="bot-mascot-svg"
     >
-      {/* Ăng-ten trái tim/mầm xanh */}
-      <path d="M32 14V8" stroke="#FDE68A" strokeWidth="3.5" strokeLinecap="round" />
-      <circle cx="32" cy="7" r="4" fill="#FDE68A" />
-      {/* Tai nghe hai bên */}
-      <rect x="6" y="26" width="7" height="16" rx="3.5" fill="#A7F3D0" />
-      <rect x="51" y="26" width="7" height="16" rx="3.5" fill="#A7F3D0" />
-      {/* Đầu bo tròn */}
-      <rect x="11" y="14" width="42" height="38" rx="18" fill="#FFFDF9" stroke="#154D3A" strokeWidth="2.5" />
-      {/* Màn hình khuôn mặt */}
-      <rect x="17" y="21" width="30" height="23" rx="11" fill="#154D3A" />
-      {/* Mắt tròn lấp lánh */}
-      <circle cx="25.5" cy="31" r="3" fill="#FFFDF9" />
-      <circle cx="26.5" cy="29.8" r="1" fill="#A7F3D0" />
-      <circle cx="38.5" cy="31" r="3" fill="#FFFDF9" />
-      <circle cx="39.5" cy="29.8" r="1" fill="#A7F3D0" />
-      {/* Má hồng cute */}
-      <ellipse cx="21.5" cy="35.5" rx="2.8" ry="1.6" fill="#FDA4AF" opacity="0.9" />
-      <ellipse cx="42.5" cy="35.5" rx="2.8" ry="1.6" fill="#FDA4AF" opacity="0.9" />
-      {/* Nụ cười nhỏ xinh */}
-      <path d="M29 36.5C30.4 38.2 33.6 38.2 35 36.5" stroke="#FFFDF9" strokeWidth="2.2" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="beToanHood" x1="10" y1="8" x2="54" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#34D399" />
+          <stop offset="100%" stopColor="#0F5132" />
+        </linearGradient>
+        <linearGradient id="beToanFace" x1="32" y1="20" x2="32" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FFFDF9" />
+          <stop offset="100%" stopColor="#F5EFE6" />
+        </linearGradient>
+      </defs>
+
+      {/* Ngôi sao AI lấp lánh trên đỉnh */}
+      <path
+        className="bot-mascot-star"
+        d="M32 3.5L33.9 8.1L38.5 10L33.9 11.9L32 16.5L30.1 11.9L25.5 10L30.1 8.1L32 3.5Z"
+        fill="#FDE047"
+      />
+
+      {/* Tai mèo/mái nhà bo tròn dễ thương */}
+      <path
+        d="M15 24C12 16 17 11 24 16L32 12L40 16C47 11 52 16 49 24"
+        fill="url(#beToanHood)"
+        stroke="#0D3427"
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+      />
+
+      {/* Khung đầu tròn chibi */}
+      <rect
+        x="11"
+        y="17"
+        width="42"
+        height="37"
+        rx="18.5"
+        fill="url(#beToanHood)"
+        stroke="#0D3427"
+        strokeWidth="2.2"
+      />
+
+      {/* Khuôn mặt kem ấm */}
+      <rect x="16.5" y="23.5" width="31" height="24.5" rx="12.25" fill="url(#beToanFace)" />
+
+      {/* Đôi mắt to lấp lánh có hiệu ứng chớp mắt */}
+      <g className="bot-mascot-eyes">
+        <circle cx="25.5" cy="34" r="3.4" fill="#12201B" />
+        <circle cx="26.7" cy="32.7" r="1.2" fill="#FFFFFF" />
+        <circle cx="24.5" cy="35" r="0.6" fill="#A7F3D0" />
+
+        <circle cx="38.5" cy="34" r="3.4" fill="#12201B" />
+        <circle cx="39.7" cy="32.7" r="1.2" fill="#FFFFFF" />
+        <circle cx="37.5" cy="35" r="0.6" fill="#A7F3D0" />
+      </g>
+
+      {/* Má hồng đào siêu cute */}
+      <ellipse cx="21" cy="39.2" rx="3.2" ry="1.8" fill="#FDA4AF" opacity="0.85" />
+      <ellipse cx="43" cy="39.2" rx="3.2" ry="1.8" fill="#FDA4AF" opacity="0.85" />
+
+      {/* Miệng cười chúm chím kiểu mèo */}
+      <path
+        d="M28.8 39.2C29.8 41.2 31.3 41.2 32 39.7C32.7 41.2 34.2 41.2 35.2 39.2"
+        stroke="#154D3A"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -55,7 +100,7 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
     {
       id: 'welcome',
       role: 'model',
-      text: 'Chào bạn nè! Mình là Bot tư vấn của Phòng trọ Ngọc Toàn. Bạn muốn tìm phòng tầm giá nào, có gác hay gần khu nào ở Bình Thạnh để mình gợi ý nha!',
+      text: 'Chào bạn nè! Mình là Bé Toàn AI — trợ lý tìm phòng của Phòng trọ Ngọc Toàn. Bạn muốn tìm phòng tầm giá nào, có gác hay gần khu nào ở Bình Thạnh để Bé gợi ý giúp nha!',
       rooms: [],
     },
   ])
@@ -114,7 +159,7 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
         {
           id: `b-${Date.now()}`,
           role: 'model',
-          text: data?.reply || 'Mình đã tìm thông tin phòng giúp bạn rồi nè!',
+          text: data?.reply || 'Bé Toàn AI đã tìm thông tin phòng giúp bạn rồi nè!',
           rooms: Array.isArray(data?.rooms) ? data.rooms : [],
         },
       ])
@@ -124,7 +169,7 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
         {
           id: `b-err-${Date.now()}`,
           role: 'model',
-          text: caught?.message || 'Hic, mạng đang hơi chập chờn xíu. Bạn thử nhắn lại giúp Bot tư vấn nhé!',
+          text: caught?.message || 'Hic, mạng đang hơi chập chờn xíu. Bạn thử nhắn lại giúp Bé Toàn AI nhé!',
           rooms: [],
         },
       ])
@@ -143,23 +188,23 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
   return (
     <div className={`consult-bot-root${hasMobileStickyCta ? ' has-sticky-cta' : ''}`}>
       {open && (
-        <section className="consult-bot-window" role="dialog" aria-label="Cửa sổ chat Bot tư vấn">
+        <section className="consult-bot-window" role="dialog" aria-label="Cửa sổ chat Bé Toàn AI">
           <header className="consult-bot-header">
             <div className="consult-bot-title-wrap">
               <div className="consult-bot-avatar">
-                <BotMascot size={36} />
+                <BeToanMascot size={40} />
                 <span className="consult-bot-dot" aria-hidden="true" />
               </div>
               <div>
-                <strong>Bot tư vấn</strong>
-                <small>Trợ lý tìm phòng Bình Thạnh</small>
+                <strong>Bé Toàn AI</strong>
+                <small>Trợ lý tìm phòng · Ngọc Toàn</small>
               </div>
             </div>
             <button
               type="button"
               className="consult-bot-close"
               onClick={() => setOpen(false)}
-              aria-label="Đóng Bot tư vấn"
+              aria-label="Đóng Bé Toàn AI"
             >
               ×
             </button>
@@ -202,7 +247,7 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
 
             {sending && (
               <div className="bot-msg-group is-model">
-                <div className="bot-bubble is-model is-typing" aria-label="Bot tư vấn đang trả lời">
+                <div className="bot-bubble is-model is-typing" aria-label="Bé Toàn AI đang trả lời">
                   <span /><span /><span />
                 </div>
               </div>
@@ -237,7 +282,7 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
               maxLength={400}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Nhắn tìm phòng (vd: dưới 4tr có gác)..."
+              placeholder="Nhắn Bé Toàn AI (vd: dưới 4tr có gác)..."
               disabled={sending}
             />
             <button type="submit" className="consult-bot-send" disabled={sending || !input.trim()}>
@@ -255,13 +300,13 @@ export default function ConsultBotWidget({ navigate, hasMobileStickyCta = false 
           window.setTimeout(() => inputRef.current?.focus(), 120)
         }}
         aria-expanded={open}
-        aria-label="Mở Bot tư vấn"
+        aria-label="Mở Bé Toàn AI"
       >
         <span className="consult-bot-launcher-avatar">
-          <BotMascot size={34} />
+          <BeToanMascot size={38} />
           <span className="consult-bot-dot" aria-hidden="true" />
         </span>
-        <span className="consult-bot-launcher-label">Bot tư vấn</span>
+        <span className="consult-bot-launcher-label">Bé Toàn AI</span>
       </button>
     </div>
   )

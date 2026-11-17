@@ -1799,7 +1799,7 @@ textarea:focus-visible {
 }
 
 /* =========================================================
-   BOT TU VAN FLOATING CHATBOT WIDGET
+   BE TOAN AI FLOATING CHATBOT WIDGET
    ========================================================= */
 .consult-bot-root {
   position: fixed;
@@ -1813,29 +1813,67 @@ textarea:focus-visible {
 }
 
 .consult-bot-launcher {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 7px 15px 7px 9px;
+  padding: 6px 16px 6px 8px;
   color: #FFFFFF;
-  background: linear-gradient(135deg, #1B634B 0%, #154D3A 100%);
+  background: linear-gradient(135deg, #247A5D 0%, #154D3A 55%, #0D3427 100%);
   border: 2px solid #A7F3D0;
   border-radius: var(--radius-pill);
-  box-shadow: 0 10px 26px rgb(21 77 58 / 28%);
+  box-shadow:
+    0 12px 28px rgb(21 77 58 / 30%),
+    0 0 0 4px rgb(167 243 208 / 28%);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   animation: botFloat 3.2s ease-in-out infinite;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+}
+
+.consult-bot-launcher::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 26%) 50%, transparent 80%);
+  transform: translateX(-120%);
+  animation: botSheen 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .consult-bot-launcher:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 14px 30px rgb(21 77 58 / 34%);
+  transform: translateY(-3px) scale(1.03);
+  box-shadow:
+    0 16px 34px rgb(21 77 58 / 38%),
+    0 0 0 6px rgb(167 243 208 / 40%);
+}
+
+.consult-bot-launcher:hover .bot-mascot-svg {
+  transform: rotate(-7deg) scale(1.08);
 }
 
 .consult-bot-launcher.is-open {
   animation: none;
+}
+
+.bot-mascot-svg {
+  display: block;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  filter: drop-shadow(0 2px 4px rgb(13 52 39 / 22%));
+}
+
+.bot-mascot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: botBlink 4.6s ease-in-out infinite;
+}
+
+.bot-mascot-star {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: botSparkle 2.4s ease-in-out infinite;
 }
 
 .consult-bot-launcher-avatar,
@@ -1857,7 +1895,17 @@ textarea:focus-visible {
   border-radius: 50%;
 }
 
+.consult-bot-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid #4ADE80;
+  animation: botPulseRing 2s ease-out infinite;
+}
+
 .consult-bot-launcher-label {
+  position: relative;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
@@ -1867,7 +1915,69 @@ textarea:focus-visible {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes botSheen {
+  0%, 58% {
+    transform: translateX(-120%);
+  }
+  82%, 100% {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes botPulseRing {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes botBlink {
+  0%, 45%, 49%, 94%, 98%, 100% {
+    transform: scaleY(1);
+  }
+  47%, 96% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes botSparkle {
+  0%, 100% {
+    transform: scale(0.9) rotate(0deg);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.16) rotate(12deg);
+    opacity: 1;
+  }
+}
+
+@keyframes botWindowPop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes botMsgIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -1881,6 +1991,8 @@ textarea:focus-visible {
   border: 1px solid var(--border-subtle);
   border-radius: 22px;
   box-shadow: 0 22px 48px rgb(13 52 39 / 22%);
+  transform-origin: bottom right;
+  animation: botWindowPop 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .consult-bot-header {
@@ -1946,6 +2058,7 @@ textarea:focus-visible {
   flex-direction: column;
   gap: 7px;
   max-width: 90%;
+  animation: botMsgIn 0.2s ease-out;
 }
 
 .bot-msg-group.is-user {
