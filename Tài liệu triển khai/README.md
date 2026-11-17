@@ -12,6 +12,7 @@ Thư mục này chuyển bộ BA thành kế hoạch phát triển theo các spr
 - [Sprint 3 — Tìm kiếm, Lọc nâng cao và Tối ưu UX/Hiệu năng](<./Sprint_3_Tim_Kiem_Loc_Nang_Cao_Toi_Uu_UX_Hieu_Nang.md>)
 - [Sprint 4 — Nghiệm thu và triển khai Production (Go-Live)](<./Sprint_4_Nghiem_Thu_Trien_Khai_Production_Go_Live.md>)
 - [Sprint 5 — Tự động nhập liệu từ bài đăng Facebook/Zalo & tối ưu vận hành](<./Sprint_5_Tu_Dong_Nhap_Lieu_Va_Toi_Uu_Van_Hanh.md>)
+- [Sprint 6 — Chatbot AI "Bot tư vấn" khách hàng theo dữ liệu thực tế](<./Sprint_6_Chatbot_AI_Tu_Van_Khach_Hang.md>)
 
 ## Trạng thái thực hiện hiện tại
 
@@ -35,6 +36,7 @@ Kế hoạch dưới đây đồng bộ với bộ tài liệu BA (`01`–`11`).
 | Sprint 3 | Tìm kiếm, lọc nâng cao và tối ưu UX/Hiệu năng | Bộ lọc kết hợp từ khóa, phường, loại phòng, giá min/max, diện tích min/max, tình trạng phòng, sắp xếp & phân trang giữ bộ lọc (`AT-03`, `AT-04`, `AT-18`); tối ưu ảnh/lazy load, xử lý trạng thái tải/rỗng/lỗi mạng; đo hiệu năng p75 ≤3s (`NFR-13`, `AT-40`). |
 | Sprint 4 | Nghiệm thu và triển khai Production (`Go-Live`) | Đối chiếu toàn bộ `AT-01`–`AT-49` (tài liệu `10`), cấu hình tên miền/HTTPS, tách staging/production, object storage, backup 7 daily + 4 weekly & diễn tập restore (`NFR-11`, `AT-39`), giám sát/cảnh báo, nhập dữ liệu thật và bàn giao runbook (`UC-10`, `UC-11`). |
 | Sprint 5 | Nhập liệu thông minh từ bài đăng Facebook/Zalo & tối ưu vận hành | Dán nội dung bài đăng Facebook/Zalo thô tại `/rooms/new` để tự động bóc tách giá, tiêu đề, mô tả, địa chỉ, gợi ý phường Bình Thạnh 2026, tiện nghi & SĐT/Zalo (`0đ` chi phí AI API, `AT-501`–`AT-508`), thêm ảnh và lưu bản nháp nhanh. |
+| Sprint 6 | Chatbot AI `"Bot tư vấn"` khách hàng (`client/` + Gemini Free) | Tích hợp bong bóng chat `"Bot tư vấn"` dễ thương trên trang khách (`ConsultBotWidget`), kết nối `POST /api/v1/public/chat` dùng Gemini 2.5 Flash + RAG dữ liệu thật từ MongoDB (bảo mật `privateAddress`, rate-limit & `smart-fallback`, `AT-601`–`AT-607`). |
 
 Thời lượng từng sprint được chốt khi planning theo năng lực và phạm vi thực tế. Sprint 1, Sprint 2, Sprint 3 và Sprint 4 hiện đề xuất 2 tuần/sprint; xem [tài liệu Sprint 1](<./Sprint_1_Admin_Quan_ly_Tin_Phong.md>), [tài liệu Sprint 2](<./Sprint_2_Khach_Xem_Danh_Sach_Chi_Tiet.md>), [tài liệu Sprint 3](<./Sprint_3_Tim_Kiem_Loc_Nang_Cao_Toi_Uu_UX_Hieu_Nang.md>) và [tài liệu Sprint 4](<./Sprint_4_Nghiem_Thu_Trien_Khai_Production_Go_Live.md>) để biết backlog và tiêu chí chi tiết. Mỗi sprint bắt đầu bằng mục tiêu rõ, kết thúc bằng bản chạy được để review và ghi lại việc cần cải thiện.
 

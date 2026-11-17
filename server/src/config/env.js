@@ -74,6 +74,8 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
   CLOUDINARY_FOLDER: z.string().trim().min(1).default("room-rental-binh-thanh"),
   CLOUDINARY_API_BASE: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  GEMINI_API_KEY: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  GEMINI_MODEL: z.string().trim().min(1).default("gemini-2.5-flash"),
 }).superRefine((data, ctx) => {
   const effectiveCookieSecure = data.COOKIE_SECURE ?? data.NODE_ENV === "production";
   if (data.COOKIE_SAMESITE === "None" && !effectiveCookieSecure) {

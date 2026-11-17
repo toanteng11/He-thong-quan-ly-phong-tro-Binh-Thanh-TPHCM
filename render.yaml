@@ -39,3 +39,7 @@ services:
         sync: false
       - key: ALERT_WEBHOOK_URL
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash

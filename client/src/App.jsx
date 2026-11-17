@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Icon from './components/Icon.jsx'
+import ConsultBotWidget from './components/ConsultBotWidget.jsx'
 import { api } from './lib/api.js'
 import { branding } from './branding.js'
 import './App.css'
@@ -220,21 +221,25 @@ function Brand({ to, navigate }) {
 
 function App() {
   const [location, navigate] = useLocationRouter()
-
-  if (location.pathname === '/' || location.pathname === '/rooms') {
-    return <PublicCatalogPage location={location} navigate={navigate} />
-  }
   const publicDetailMatch = location.pathname.match(/^\/rooms\/([^/]+)$/i)
-  if (publicDetailMatch) {
-    return (
-      <PublicRoomDetailPage
-        roomId={publicDetailMatch[1]}
-        navigate={navigate}
-        backPath={location.lastCatalogPath}
-      />
-    )
-  }
-  return <NotFound navigate={navigate} homePath="/rooms" homeLabel="Về danh sách phòng" />
+  const isCatalog = location.pathname === '/' || location.pathname === '/rooms'
+
+  return (
+    <>
+      {isCatalog ? (
+        <PublicCatalogPage location={location} navigate={navigate} />
+      ) : publicDetailMatch ? (
+        <PublicRoomDetailPage
+          roomId={publicDetailMatch[1]}
+          navigate={navigate}
+          backPath={location.lastCatalogPath}
+        />
+      ) : (
+        <NotFound navigate={navigate} homePath="/rooms" homeLabel="Về danh sách phòng" />
+      )}
+      <ConsultBotWidget navigate={navigate} hasMobileStickyCta={Boolean(publicDetailMatch)} />
+    </>
+  )
 }
 
 /* =========================================================

@@ -34,7 +34,7 @@ app.use((request, response, next) => {
     response.setHeader("Vary", "Origin");
     response.setHeader(
       "Access-Control-Allow-Methods",
-      isAdminRoute ? "GET, POST, PUT, PATCH, DELETE, OPTIONS" : "GET, OPTIONS",
+      isAdminRoute ? "GET, POST, PUT, PATCH, DELETE, OPTIONS" : "GET, POST, OPTIONS",
     );
     response.setHeader("Access-Control-Allow-Headers", "Content-Type");
     if (isAdminRoute) {

@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const { z } = require("zod");
 const { getCollections } = require("../db/mongo");
+const { env } = require("../config/env");
 const { imageStorage } = require("../storage/image-storage");
 
 const router = Router();
@@ -332,6 +333,313 @@ router.get("/rooms/:roomId/images/:imageId/file", async (request, response, next
       optimizeForPublic: true,
       next,
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+const chatAttempts = new Map();
+const CHAT_WINDOW_MS = 10 * 60 * 1000;
+const MAX_CHAT_PER_WINDOW = 20;
+
+const chatRequestSchema = z.object({
+  message: z.string().trim().min(1, "Vui lòng nhập câu hỏi.").max(400),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "model"]),
+        text: z.string().trim().min(1).max(600),
+      }),
+    )
+    .max(8)
+    .optional()
+    .default([]),
+}).strict();
+
+function foldVi(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
+function checkChatRateLimit(ipKey) {
+  const now = Date.now();
+  if (chatAttempts.size > 2000) {
+    for (const [k, v] of chatAttempts) {
+      if (v.resetAt <= now) chatAttempts.delete(k);
+    }
+  }
+  const entry = chatAttempts.get(ipKey);
+  if (!entry || entry.resetAt <= now) {
+    chatAttempts.set(ipKey, { count: 1, resetAt: now + CHAT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_CHAT_PER_WINDOW) {
+    return false;
+  }
+  entry.count += 1;
+  return true;
+}
+
+function parseChatIntent(foldedMsg) {
+  let maxBudget = null;
+  const underMatch = foldedMsg.match(/(?:duoi|<=|tam|khoang|toi da|budget|gia)?\s*(\d{1,2})\s*(?:tr|trieu)\s*(\d{1,2})?/);
+  if (underMatch) {
+    const major = Number(underMatch[1]);
+    const dec = underMatch[2] ? (underMatch[2].length === 1 ? Number(underMatch[2]) * 100_000 : Number(underMatch[2]) * 10_000) : 0;
+    const val = major * 1_000_000 + dec;
+    if (val >= 1_000_000 && val <= 30_000_000) {
+      maxBudget = foldedMsg.includes("duoi") ? val : val + 500_000;
+    }
+  }
+
+  let targetWard = "";
+  if (foldedMsg.includes("gia dinh") || foldedMsg.includes("ba chieu") || foldedMsg.includes("nguyen cuu van")) {
+    targetWard = "Phường Gia Định";
+  } else if (foldedMsg.includes("thanh my tay") || foldedMsg.includes("hang xanh") || foldedMsg.includes("hutech") || foldedMsg.includes("ngoai thuong") || foldedMsg.includes("landmark")) {
+    targetWard = "Phường Thạnh Mỹ Tây";
+  } else if (foldedMsg.includes("binh loi trung") || foldedMsg.includes("van lang") || foldedMsg.includes("binh loi")) {
+    targetWard = "Phường Bình Lợi Trung";
+  } else if (foldedMsg.includes("binh quoi") || foldedMsg.includes("thanh da")) {
+    targetWard = "Phường Bình Quới";
+  } else if (foldedMsg.includes("dinh bo linh") || foldedMsg.includes("nguyen xi") || foldedMsg.includes("bx mien dong") || foldedMsg.includes("chu van an") || /phuong\s*binh thanh/.test(foldedMsg)) {
+    targetWard = "Phường Bình Thạnh";
+  }
+
+  const amenityHints = AMENITIES.filter((item) => {
+    const f = foldVi(item);
+    if (f === "ban cong" && (foldedMsg.includes("ban cong") || foldedMsg.includes("bancol"))) return true;
+    if (f === "nha ve sinh rieng" && (foldedMsg.includes("wc") || foldedMsg.includes("ve sinh"))) return true;
+    if (f === "cho de xe" && (foldedMsg.includes("xe") || foldedMsg.includes("nha xe"))) return true;
+    return foldedMsg.includes(f);
+  });
+
+  let roomTypeHint = "";
+  if (foldedMsg.includes("studio")) roomTypeHint = "Phòng studio";
+  else if (foldedMsg.includes("can ho") || foldedMsg.includes("mini") || foldedMsg.includes("chdv")) roomTypeHint = "Căn hộ mini";
+  else if (foldedMsg.includes("o ghep")) roomTypeHint = "Phòng ở ghép";
+  else if (foldedMsg.includes("gac")) roomTypeHint = "Phòng có gác";
+
+  return { maxBudget, targetWard, amenityHints, roomTypeHint };
+}
+
+function rankRoomsForChat(docs, message) {
+  const foldedMsg = foldVi(message);
+  const intent = parseChatIntent(foldedMsg);
+  const tokens = foldedMsg
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 2 && !["phong", "tro", "binh", "thanh", "cho", "hoi", "tim", "can", "thue", "co", "khong", "nao", "bao", "nhieu", "gan", "khu", "vuc", "gia"].includes(w));
+
+  const scored = docs.map((doc) => {
+    let score = doc.availability === "AVAILABLE" ? 50 : -100;
+    const price = Number(doc.priceVnd || 0);
+    const haystack = foldVi(`${doc.title} ${doc.publicAddress} ${doc.ward} ${doc.roomType} ${(doc.amenities || []).join(" ")} ${doc.description}`);
+
+    if (intent.maxBudget && price > 0) {
+      if (price <= intent.maxBudget) score += 25;
+      else score -= 30;
+    }
+    if (intent.targetWard && doc.ward === intent.targetWard) {
+      score += 30;
+    }
+    if (intent.roomTypeHint && doc.roomType === intent.roomTypeHint) {
+      score += 20;
+    }
+    for (const am of intent.amenityHints) {
+      if ((doc.amenities || []).includes(am)) score += 12;
+    }
+    for (const tok of tokens) {
+      if (haystack.includes(tok)) score += 6;
+    }
+    if (foldedMsg.includes("re nhat") && price > 0) {
+      score += Math.max(0, 20 - Math.round(price / 500_000));
+    }
+    return { doc, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return { scored, intent };
+}
+
+function buildFallbackReply(docs, ranked, message) {
+  const availableDocs = docs.filter((d) => d.availability === "AVAILABLE");
+  if (!availableDocs.length) {
+    return {
+      reply: "Dạ chào bạn! Hiện tại các phòng đăng trên hệ thống đều đã có khách thuê hết rồi ạ. Bạn quay lại sau hoặc nhắn Zalo chủ trọ để được báo ngay khi có phòng trống mới nha!",
+      rooms: [],
+    };
+  }
+
+  const folded = foldVi(message);
+  const isGreetingOnly = /^(?:hi|hello|alo|chao|xin chao|bot oi|ad oi|tu van|help)[!.,\s]*$/.test(folded);
+  const topMatched = ranked.scored
+    .filter((item) => item.doc.availability === "AVAILABLE")
+    .slice(0, 3)
+    .map((item) => item.doc);
+
+  if (isGreetingOnly) {
+    const minPrice = Math.min(...availableDocs.map((d) => Number(d.priceVnd || 0)).filter(Boolean));
+    const priceText = minPrice ? `từ ${(minPrice / 1_000_000).toLocaleString("vi-VN")} triệu/tháng` : "giá hợp lý";
+    return {
+      reply: `Chào bạn nè! Mình là Bot tư vấn của Phòng trọ Ngọc Toàn. Hiện bên mình đang có ${availableDocs.length} phòng trống tại Bình Thạnh (${priceText}). Bạn muốn tìm phòng tầm giá nào hay gần khu vực nào để mình lọc giúp nhé!`,
+      rooms: topMatched.map(toPublicListItem),
+    };
+  }
+
+  const hasExactHit = ranked.scored.some((item) => item.doc.availability === "AVAILABLE" && item.score > 60);
+  if (hasExactHit) {
+    return {
+      reply: `Mình tìm thấy ${topMatched.length} phòng còn trống khá hợp với nhu cầu của bạn nè! Bạn bấm trực tiếp vào thẻ phòng bên dưới để xem hình thật và gọi/nhắn Zalo xem phòng nha.`,
+      rooms: topMatched.map(toPublicListItem),
+    };
+  }
+
+  return {
+    reply: `Hiện chưa có phòng khớp 100% tiêu chí đó, nhưng bên mình vẫn còn ${availableDocs.length} phòng trống rất đẹp ở Bình Thạnh nè! Bạn tham khảo thử các căn gần nhất bên dưới nhé:`,
+    rooms: topMatched.map(toPublicListItem),
+  };
+}
+
+router.post("/chat", async (request, response, next) => {
+  response.setHeader("Cache-Control", "no-store");
+  const clientIp = request.ip || "unknown";
+  if (!checkChatRateLimit(clientIp)) {
+    return sendError(
+      response,
+      request,
+      429,
+      "CHAT_RATE_LIMITED",
+      "Bạn nhắn hơi nhanh rồi, nghỉ tay vài giây rồi hỏi lại Bot tư vấn nhé!",
+    );
+  }
+
+  const parsed = chatRequestSchema.safeParse(request.body);
+  if (!parsed.success) {
+    return sendError(response, request, 400, "INVALID_INPUT", "Vui lòng nhập câu hỏi ngắn gọn (tối đa 400 ký tự).");
+  }
+
+  try {
+    const { roomListings } = await getCollections();
+    const docs = await roomListings
+      .find(
+        { publishStatus: "PUBLISHED", deletedAt: null },
+        {
+          projection: {
+            _id: 1,
+            title: 1,
+            description: 1,
+            roomType: 1,
+            priceVnd: 1,
+            areaM2: 1,
+            amenities: 1,
+            ward: 1,
+            district: 1,
+            city: 1,
+            publicAddress: 1,
+            availability: 1,
+            publishedAt: 1,
+            updatedAt: 1,
+            images: 1,
+            allowPublicPhone: 1,
+            contactPhone: 1,
+            allowPublicZalo: 1,
+            contactZalo: 1,
+          },
+        },
+      )
+      .sort({ availability: 1, publishedAt: -1 })
+      .limit(24)
+      .toArray();
+
+    const ranked = rankRoomsForChat(docs, parsed.data.message);
+    const availableTop = ranked.scored
+      .filter((entry) => entry.doc.availability === "AVAILABLE")
+      .slice(0, 3)
+      .map((entry) => entry.doc);
+
+    if (!env.GEMINI_API_KEY) {
+      const fb = buildFallbackReply(docs, ranked, parsed.data.message);
+      return response.json({ ...fb, mode: "smart-fallback" });
+    }
+
+    const groundedCatalog = docs
+      .filter((d) => d.availability === "AVAILABLE")
+      .slice(0, 12)
+      .map((d) => ({
+        id: d._id,
+        tieuDe: d.title,
+        loaiPhong: d.roomType,
+        giaVnd: d.priceVnd,
+        dienTichM2: d.areaM2,
+        khuVuc: d.publicAddress,
+        phuong: d.ward,
+        tienNghi: d.amenities || [],
+        sdtLienHe: d.allowPublicPhone && d.contactPhone ? d.contactPhone : null,
+        zaloLienHe: d.allowPublicZalo && d.contactZalo ? d.contactZalo : null,
+      }));
+
+    const systemText = [
+      'Bạn tên là "Bot tư vấn", trợ lý AI thân thiện, dễ thương (cute vừa phải, lễ phép, dùng tiếng Việt tự nhiên) của website Phòng trọ Ngọc Toàn tại Quận Bình Thạnh, TP.HCM.',
+      "QUY TẮC BẮT BUỘC:",
+      "1. CHỈ được tư vấn dựa trên danh sách PHÒNG CÒN TRỐNG THẬT trong JSON bên dưới. Tuyệt đối KHÔNG tự bịa phòng, giá tiền, diện tích, địa chỉ hay số điện thoại không có trong dữ liệu.",
+      "2. Không nêu địa chỉ số nhà cụ thể, chỉ nói khu vực và phường được cung cấp.",
+      "3. Trả lời ngắn gọn (tối đa 4-5 câu), dễ đọc trên điện thoại. Nếu có phòng phù hợp, hãy nhắc nhẹ tên phòng, giá và mời khách bấm vào thẻ phòng ngay bên dưới để xem hình thật & gọi/nhắn Zalo.",
+      "4. Nếu chưa có phòng khớp hoàn toàn, hãy xin lỗi dễ thương, gợi ý các lựa chọn còn trống gần nhất và hướng dẫn khách nhắn Zalo nếu có.",
+      `DỮ LIỆU PHÒNG CÒN TRỐNG HIỆN TẠI (${groundedCatalog.length} phòng):`,
+      JSON.stringify(groundedCatalog),
+    ].join("\n");
+
+    const contents = [
+      ...parsed.data.history.map((item) => ({
+        role: item.role === "model" ? "model" : "user",
+        parts: [{ text: item.text }],
+      })),
+      { role: "user", parts: [{ text: parsed.data.message }] },
+    ];
+
+    try {
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": env.GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemText }] },
+            contents,
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 320,
+            },
+          }),
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+
+      if (geminiRes.ok) {
+        const geminiJson = await geminiRes.json();
+        const aiText = geminiJson?.candidates?.[0]?.content?.parts
+          ?.map((part) => part?.text || "")
+          .join("")
+          .trim();
+        if (aiText) {
+          return response.json({
+            reply: aiText,
+            rooms: availableTop.map(toPublicListItem),
+            mode: "gemini",
+          });
+        }
+      }
+    } catch {
+      // Fallback sang trả lời thông minh từ MongoDB nếu Gemini lỗi hoặc hết quota
+    }
+
+    const fb = buildFallbackReply(docs, ranked, parsed.data.message);
+    return response.json({ ...fb, mode: "smart-fallback" });
   } catch (error) {
     return next(error);
   }
