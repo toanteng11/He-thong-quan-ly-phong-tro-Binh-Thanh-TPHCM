@@ -409,6 +409,128 @@ function requireSameOriginForWrites(request, response, next) {
 
 router.use(requireAdmin, requirePasswordUpdated, requireSameOriginForWrites);
 
+const GEOCODE_OLD_WARD_TO_2026 = {
+  1: "Phường Gia Định",
+  2: "Phường Gia Định",
+  3: "Phường Gia Định",
+  7: "Phường Gia Định",
+  15: "Phường Gia Định",
+  17: "Phường Gia Định",
+  12: "Phường Bình Thạnh",
+  14: "Phường Bình Thạnh",
+  24: "Phường Bình Thạnh",
+  26: "Phường Bình Thạnh",
+  5: "Phường Bình Lợi Trung",
+  6: "Phường Bình Lợi Trung",
+  11: "Phường Bình Lợi Trung",
+  13: "Phường Bình Lợi Trung",
+  19: "Phường Thạnh Mỹ Tây",
+  21: "Phường Thạnh Mỹ Tây",
+  22: "Phường Thạnh Mỹ Tây",
+  25: "Phường Thạnh Mỹ Tây",
+  27: "Phường Bình Quới",
+  28: "Phường Bình Quới",
+};
+const geocodeCache = new Map();
+
+function foldVietnameseLower(text) {
+  return String(text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
+function normalizeBinhThanhWard2026(rawLabel) {
+  const folded = foldVietnameseLower(rawLabel).trim();
+  if (!folded) return "";
+  if (folded.includes("gia dinh")) return "Phường Gia Định";
+  if (folded.includes("binh loi trung")) return "Phường Bình Lợi Trung";
+  if (folded.includes("thanh my tay")) return "Phường Thạnh Mỹ Tây";
+  if (folded.includes("binh quoi")) return "Phường Bình Quới";
+  if (/^(?:phuong|p\.?)\s*binh thanh$/.test(folded) || folded === "binh thanh") {
+    return "Phường Bình Thạnh";
+  }
+  const numMatch = folded.match(/(?:phuong|p\.?|ward)\s*0?(\d{1,2})\b/i);
+  if (numMatch) {
+    return GEOCODE_OLD_WARD_TO_2026[Number(numMatch[1])] || "";
+  }
+  return "";
+}
+
+router.get("/geocode-ward", async (request, response) => {
+  const rawQuery = String(request.query.q || "").trim().slice(0, 300);
+  if (!rawQuery) {
+    return response.json({ ward: "", rawSuburb: "", source: "none" });
+  }
+
+  // Bỏ số hẻm (/12) để tăng độ chính xác khi tìm mặt tiền đường trên bản đồ
+  const normalizedAddr = rawQuery.replace(/\b(\d+)\/[0-9A-Za-z-]+\b/g, "$1");
+  const fullQuery = foldVietnameseLower(normalizedAddr).includes("binh thanh")
+    ? `${normalizedAddr}, Thành phố Hồ Chí Minh`
+    : `${normalizedAddr}, Bình Thạnh, Thành phố Hồ Chí Minh`;
+
+  const cached = geocodeCache.get(fullQuery);
+  if (cached && cached.expiresAt > Date.now()) {
+    return response.json(cached.value);
+  }
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=3&countrycodes=vn&accept-language=vi&q=${encodeURIComponent(fullQuery)}`;
+    const upstream = await fetch(url, {
+      headers: {
+        "User-Agent": "PhongTroBinhThanhAdmin/1.0 (https://admin.phongtrobinhthanh.id.vn)",
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!upstream.ok) {
+      return response.json({ ward: "", rawSuburb: "", source: "unavailable" });
+    }
+
+    const candidates = await upstream.json();
+    let matchedWard = "";
+    let rawSuburb = "";
+
+    if (Array.isArray(candidates)) {
+      for (const item of candidates) {
+        const addr = item?.address || {};
+        const cityContext = foldVietnameseLower(`${addr.city || ""} ${addr.state || ""} ${addr.city_district || ""} ${item?.display_name || ""}`);
+        if (!cityContext.includes("ho chi minh") && !cityContext.includes("binh thanh")) continue;
+
+        for (const candidateField of [addr.suburb, addr.quarter, addr.neighbourhood]) {
+          const resolved = normalizeBinhThanhWard2026(candidateField);
+          if (resolved) {
+            matchedWard = resolved;
+            rawSuburb = String(candidateField || "");
+            break;
+          }
+        }
+        if (matchedWard) break;
+      }
+    }
+
+    const payload = {
+      ward: matchedWard,
+      rawSuburb,
+      source: matchedWard ? "nominatim" : "none",
+    };
+
+    if (geocodeCache.size > 500) {
+      const oldestKey = geocodeCache.keys().next().value;
+      if (oldestKey) geocodeCache.delete(oldestKey);
+    }
+    geocodeCache.set(fullQuery, {
+      value: payload,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    });
+
+    return response.json(payload);
+  } catch {
+    return response.json({ ward: "", rawSuburb: "", source: "unavailable" });
+  }
+});
+
 router.get("/dashboard", async (_request, response, next) => {
   try {
     const { roomListings } = await getCollections();

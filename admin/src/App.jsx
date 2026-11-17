@@ -1218,18 +1218,22 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   const [quickOverwrite, setQuickOverwrite] = useState(true)
   const [quickPanelOpen, setQuickPanelOpen] = useState(!roomId)
   const [quickImportResult, setQuickImportResult] = useState(null)
+  const [lookingUpWard, setLookingUpWard] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmHide, setConfirmHide] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState('')
   const [imageToRemove, setImageToRemove] = useState(null)
   const pendingUrlsRef = useRef(new Set())
+  const lookupRunRef = useRef(0)
 
   const isDirty = (savedSnapshot !== '' && JSON.stringify(form) !== savedSnapshot) || (!roomId && images.length > 0)
   const missingQuickFields = quickImportResult ? getMissingImportFields(form) : []
   const missingFieldKeys = new Set(missingQuickFields.map((item) => item.key))
 
   useEffect(() => {
+    lookupRunRef.current += 1
+    setLookingUpWard(false)
     setQuickImportResult(null)
     setQuickPanelOpen(!roomId)
   }, [roomId])
@@ -1324,6 +1328,9 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
       setError('Vui lòng dán nội dung bài đăng Facebook hoặc Zalo trước khi tự động điền.')
       return
     }
+    const runId = lookupRunRef.current + 1
+    lookupRunRef.current = runId
+    setLookingUpWard(false)
     setError('')
     setFieldErrors({})
     const parsed = parseRoomPostText(quickPostText)
@@ -1354,6 +1361,34 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
       removedNoise: parsed.removedNoise,
       suggestions: parsed.suggestions,
     })
+
+    if (parsed.needsRemoteWardLookup && parsed.lookupAddressQuery) {
+      setLookingUpWard(true)
+      api(`/admin/geocode-ward?q=${encodeURIComponent(parsed.lookupAddressQuery)}`)
+        .then((geo) => {
+          if (lookupRunRef.current !== runId || !geo?.ward) return
+          setForm((previous) => {
+            if (!quickOverwrite && previous.ward) return previous
+            return { ...previous, ward: geo.ward }
+          })
+          setQuickImportResult((previous) => {
+            if (!previous) return previous
+            const nextLabels = previous.filledLabels.includes(geo.ward)
+              ? previous.filledLabels
+              : [...previous.filledLabels, geo.ward]
+            const nextSuggestions = [
+              ...previous.suggestions.filter((item) => !item.includes('thử tra cứu theo số nhà')),
+              `Đã tự động xác định ${geo.ward} (2026) từ bản đồ theo địa chỉ.`,
+            ]
+            return { ...previous, filledLabels: nextLabels, suggestions: nextSuggestions }
+          })
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (lookupRunRef.current === runId) setLookingUpWard(false)
+        })
+    }
+
     if (parsed.missingFields.length > 0) {
       showNotice(
         `Đã tự động điền thông tin. Còn thiếu ${parsed.missingFields.length} mục — vui lòng nhập tay theo cảnh báo trên màn hình.`,
@@ -1365,6 +1400,8 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   }
 
   const clearQuickImport = () => {
+    lookupRunRef.current += 1
+    setLookingUpWard(false)
     setQuickPostText('')
     setQuickImportResult(null)
     setError('')
@@ -1868,6 +1905,11 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                       {note}
                     </p>
                   ))}
+                  {lookingUpWard && (
+                    <p className="quick-import-suggestion">
+                      Đang tự động tra cứu Phường 2026 theo bản đồ địa chỉ…
+                    </p>
+                  )}
                   {missingQuickFields.length === 0 && (
                     <p className="quick-import-ready">
                       Thông tin cơ bản đã đầy đủ — bạn có thể thêm ảnh phòng bên dưới rồi bấm Lưu bản nháp.

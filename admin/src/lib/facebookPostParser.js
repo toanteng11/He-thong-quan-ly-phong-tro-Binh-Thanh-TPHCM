@@ -23,11 +23,21 @@ export const AMENITIES = [
   'Cửa sổ',
 ]
 
-// Helper tạo regex ranh giới từ chuẩn Unicode tiếng Việt (tránh lỗi \b không nhận chữ có dấu như đ, ở, ổ, ủ)
+// Chuẩn hóa bỏ dấu tiếng Việt + chữ đ/Đ -> d để đối chiếu cả văn bản không dấu và viết tắt
+export function foldVi(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, (ch) => (ch === 'đ' ? 'd' : 'D'))
+    .toLowerCase()
+}
+
+// Helper tạo regex ranh giới từ chuẩn Unicode tiếng Việt (tránh lỗi \b với chữ có dấu)
 const uWord = (body, flags = 'iu') => new RegExp(`(?<![\\p{L}\\p{N}])(?:${body})(?![\\p{L}\\p{N}])`, flags)
+const asciiWord = (body, flags = 'i') => new RegExp(`(?<![a-z0-9])(?:${body})(?![a-z0-9])`, flags)
 
 // Ánh xạ 20 phường cũ Quận Bình Thạnh -> 5 phường mới năm 2026 (NQ 1685/NQ-UBTVQH15)
-const OLD_WARD_TO_2026 = {
+export const OLD_WARD_TO_2026 = {
   1: 'Phường Gia Định',
   2: 'Phường Gia Định',
   3: 'Phường Gia Định',
@@ -52,36 +62,101 @@ const OLD_WARD_TO_2026 = {
 
 // Sửa các lỗi chính tả / viết tắt tên đường phổ biến ở Bình Thạnh
 const STREET_SPELLING_FIXES = [
-  [uWord('nguyễn cửa vân', 'giu'), 'Nguyễn Cửu Vân'],
-  [uWord('nguyen cua van', 'giu'), 'Nguyễn Cửu Vân'],
-  [uWord('xô viết nghệ tỉnh', 'giu'), 'Xô Viết Nghệ Tĩnh'],
-  [uWord('điện biên phủ', 'giu'), 'Điện Biên Phủ'],
-  [uWord('nơ trang long', 'giu'), 'Nơ Trang Long'],
-  [uWord('ung văn khiêm', 'giu'), 'Ung Văn Khiêm'],
-  [uWord('nguyễn gia trí', 'giu'), 'Nguyễn Gia Trí'],
-  [uWord('đường\\s+d2', 'giu'), 'Nguyễn Gia Trí'],
-  [uWord('đường\\s+d3', 'giu'), 'Võ Oanh'],
-  [uWord('võ oanh', 'giu'), 'Võ Oanh'],
-  [uWord('nguyễn hữu cảnh', 'giu'), 'Nguyễn Hữu Cảnh'],
-  [uWord('vũ tùng', 'giu'), 'Vũ Tùng'],
-  [uWord('phan đăng lưu', 'giu'), 'Phan Đăng Lưu'],
-  [uWord('lê quang định', 'giu'), 'Lê Quang Định'],
-  [uWord('phan văn trị', 'giu'), 'Phan Văn Trị'],
-  [uWord('bình quới', 'giu'), 'Bình Quới'],
-  [uWord('hoàng hoa thám', 'giu'), 'Hoàng Hoa Thám'],
-  [uWord('phạm viết chánh', 'giu'), 'Phạm Viết Chánh'],
+  [uWord('nguyễn cửa vân|nguyen cua van|nguyen cuu van', 'giu'), 'Nguyễn Cửu Vân'],
+  [uWord('xô viết nghệ tỉnh|xo viet nghe tinh', 'giu'), 'Xô Viết Nghệ Tĩnh'],
+  [uWord('điện biên phủ|dien bien phu', 'giu'), 'Điện Biên Phủ'],
+  [uWord('nơ trang long|no trang long', 'giu'), 'Nơ Trang Long'],
+  [uWord('ung văn khiêm|ung van khiem', 'giu'), 'Ung Văn Khiêm'],
+  [uWord('nguyễn gia trí|nguyen gia tri|đường\\s+d2|duong\\s+d2', 'giu'), 'Nguyễn Gia Trí'],
+  [uWord('võ oanh|vo oanh|đường\\s+d3|duong\\s+d3', 'giu'), 'Võ Oanh'],
+  [uWord('nguyễn văn thương|nguyen van thuong|đường\\s+d1|duong\\s+d1', 'giu'), 'Nguyễn Văn Thương'],
+  [uWord('nguyễn hữu cảnh|nguyen huu canh', 'giu'), 'Nguyễn Hữu Cảnh'],
+  [uWord('vũ tùng|vu tung', 'giu'), 'Vũ Tùng'],
+  [uWord('phan đăng lưu|phan dang luu', 'giu'), 'Phan Đăng Lưu'],
+  [uWord('lê quang định|le quang dinh', 'giu'), 'Lê Quang Định'],
+  [uWord('phan văn trị|phan van tri', 'giu'), 'Phan Văn Trị'],
+  [uWord('bình quới|binh quoi', 'giu'), 'Bình Quới'],
+  [uWord('hoàng hoa thám|hoang hoa tham', 'giu'), 'Hoàng Hoa Thám'],
+  [uWord('phạm viết chánh|pham viet chanh', 'giu'), 'Phạm Viết Chánh'],
+  [uWord('đinh bộ lĩnh|dinh bo linh', 'giu'), 'Đinh Bộ Lĩnh'],
+  [uWord('bùi đình túy|bui dinh tuy', 'giu'), 'Bùi Đình Túy'],
+  [uWord('nguyễn xí|nguyen xi', 'giu'), 'Nguyễn Xí'],
+  [uWord('chu văn an|chu van an', 'giu'), 'Chu Văn An'],
+  [uWord('bình lợi|binh loi', 'giu'), 'Bình Lợi'],
+  [uWord('đặng thùy trâm|dang thuy tram', 'giu'), 'Đặng Thùy Trâm'],
+  [uWord('nguyễn văn đậu|nguyen van dau', 'giu'), 'Nguyễn Văn Đậu'],
+  [uWord('ngô tất tố|ngo tat to', 'giu'), 'Ngô Tất Tố'],
+  [uWord('bùi hữu nghĩa|bui huu nghia', 'giu'), 'Bùi Hữu Nghĩa'],
+  [uWord('bạch đằng|bach dang', 'giu'), 'Bạch Đằng'],
+  [uWord('nguyễn huy lượng|nguyen huy luong', 'giu'), 'Nguyễn Huy Lượng'],
 ]
 
-// Các tuyến đường đặc trưng nằm gọn trong 1 phường 2026 (không tự đoán với trục đường xuyên nhiều phường)
+// Địa danh, trường học, khu vực quen thuộc hay dùng để định vị phường ở Bình Thạnh (so khớp trên chuỗi đã bỏ dấu)
+const LANDMARK_TO_WARD_2026 = [
+  {
+    pattern: asciiWord(
+      'nga tu hang xanh|nga 4 hang xanh|hang xanh|landmark 81|landmark81|vinhomes central park|vinhomes tan cang|tan cang|pearl plaza|kdl van thanh|cong vien van thanh|van thanh|cau sai gon|dh hutech|hutech|dh gtvt|giao thong van tai|dh ngoai thuong|ngoai thuong|ftu|dh hong bang|hiu|dh uef|uef|cho thi nghe',
+    ),
+    ward: 'Phường Thạnh Mỹ Tây',
+  },
+  {
+    pattern: asciiWord(
+      'cho ba chieu|ba chieu|lang ong|bv nhan dan gia dinh|benh vien gia dinh|bv gia dinh|bv ung buou|benh vien ung buou|cau bong|cong vien le van duyet|cv le van duyet|dh thuy loi',
+    ),
+    ward: 'Phường Gia Định',
+  },
+  {
+    pattern: asciiWord(
+      'ben xe mien dong|bx mien dong|bxmd|cau dinh bo linh|hoc vien can bo|cu xa chu van an|cho chu van an|nga 5 dai liet si|nga nam dai liet si|dai liet si',
+    ),
+    ward: 'Phường Bình Thạnh',
+  },
+  {
+    pattern: asciiWord(
+      'dh van lang|dai hoc van lang|van lang|vlu|kdc binh loi|cho cay thi|cho binh hoa|nga 5 binh hoa|nga nam binh hoa|cau binh loi|rach lang',
+    ),
+    ward: 'Phường Bình Lợi Trung',
+  },
+  {
+    pattern: asciiWord('ban dao thanh da|cu xa thanh da|thanh da|cau kinh|kdl binh quoi'),
+    ward: 'Phường Bình Quới',
+  },
+]
+
+// Các tuyến đường đặc trưng nằm gọn trong 1 phường 2026 (so khớp trên chuỗi đã bỏ dấu)
 const STREET_TO_WARD_2026 = [
-  { pattern: uWord('nguyễn cửu vân|vũ tùng|vũ huy tấn|trần văn kỷ|bùi hữu nghĩa|lê văn duyệt|yên đỗ|huỳnh mẫn đạt'), ward: 'Phường Gia Định' },
-  { pattern: uWord('nguyễn gia trí|võ oanh|ung văn khiêm|nguyễn hữu cảnh|phạm viết chánh|ngô tất tố|nguyễn ngọc phương|tân cảng'), ward: 'Phường Thạnh Mỹ Tây' },
-  { pattern: uWord('bình quới|thanh đa'), ward: 'Phường Bình Quới' },
-  { pattern: uWord('nguyễn xí|đinh bộ lĩnh|chu văn an|tầm vu'), ward: 'Phường Bình Thạnh' },
-  { pattern: uWord('bình lợi|đặng thùy trâm|nguyễn văn đậu|trần quý cáp|phạm văn đồng'), ward: 'Phường Bình Lợi Trung' },
+  {
+    pattern: asciiWord(
+      'nguyen cuu van|vu tung|vu huy tan|tran van ky|bui huu nghia|le van duyet|yen do|phan van han|trinh hoai duc|dien hong|pho duc chinh|nguyen xuan on|ngo nhan tinh|nguyen thai hoc|nguyen huy tuong|nguyen lam',
+    ),
+    ward: 'Phường Gia Định',
+  },
+  {
+    pattern: asciiWord(
+      'nguyen gia tri|vo oanh|nguyen van thuong|ung van khiem|nguyen huu canh|pham viet chanh|ngo tat to|nguyen ngoc phuong|vo duy ninh|nguyen van lac|huynh man dat|nguyen cong tru|duong d1|duong d2|duong d3|khu d2',
+    ),
+    ward: 'Phường Thạnh Mỹ Tây',
+  },
+  {
+    pattern: asciiWord('binh quoi|thanh da'),
+    ward: 'Phường Bình Quới',
+  },
+  {
+    pattern: asciiWord('dinh bo linh|chu van an|bui dinh tuy|quoc lo 13|ql13|ql 13|nguyen huy luong|tam vu'),
+    ward: 'Phường Bình Thạnh',
+  },
+  {
+    pattern: asciiWord(
+      'binh loi|dang thuy tram|nguyen van dau|tran quy cap|pham van dong|tang bat ho|huynh dinh hai|le tu tai|tran binh trong|nguyen thuong hien|le truc|nguyen trung truc|luong ngoc quyen',
+    ),
+    ward: 'Phường Bình Lợi Trung',
+  },
 ]
 
-const MULTI_WARD_STREETS = uWord('xô viết nghệ tĩnh|điện biên phủ|nơ trang long|phan văn trị|lê quang định|bạch đằng|phan đăng lưu|hoàng hoa thám')
+// Các tuyến trục dài xuyên qua nhiều phường (cần địa danh kèm theo hoặc tra bản đồ theo số nhà)
+const MULTI_WARD_STREETS = asciiWord(
+  'xo viet nghe tinh|dien bien phu|no trang long|phan van tri|le quang dinh|bach dang|phan dang luu|hoang hoa tham|nguyen xi|truong sa',
+)
 
 const AMENITY_RULES = [
   { name: 'Máy lạnh', patterns: [uWord('máy lạnh|may lanh|điều hòa|dieu hoa|ml')] },
@@ -284,64 +359,87 @@ function extractAmenities(text) {
   return AMENITIES.filter((name) => matched.has(name))
 }
 
-function extractWardAndAddresses(cleanLines, normalizedText) {
-  const suggestions = []
-  let ward = ''
-
-  // 1. Khớp trực tiếp 5 phường Bình Thạnh 2026
+function resolveWardFromText(foldedScope, suggestions) {
+  // 1. Khớp trực tiếp 5 phường mới 2026 (có dấu và không dấu)
   const directWardMap = [
-    [uWord('(?:phường\\s+)?gia định'), 'Phường Gia Định'],
-    [uWord('(?:phường\\s+)?bình lợi trung'), 'Phường Bình Lợi Trung'],
-    [uWord('(?:phường\\s+)?thạnh mỹ tây'), 'Phường Thạnh Mỹ Tây'],
-    [uWord('(?:phường\\s+)?bình quới'), 'Phường Bình Quới'],
-    [uWord('phường\\s+bình thạnh'), 'Phường Bình Thạnh'],
+    [asciiWord('(?:phuong\\s+|p\\.?\\s*|f\\.?\\s*)?gia dinh'), 'Phường Gia Định'],
+    [asciiWord('(?:phuong\\s+|p\\.?\\s*|f\\.?\\s*)?binh loi trung'), 'Phường Bình Lợi Trung'],
+    [asciiWord('(?:phuong\\s+|p\\.?\\s*|f\\.?\\s*)?thanh my tay'), 'Phường Thạnh Mỹ Tây'],
+    [asciiWord('(?:phuong\\s+|p\\.?\\s*|f\\.?\\s*)?binh quoi'), 'Phường Bình Quới'],
+    [asciiWord('(?:phuong|p\\.?|f\\.?)\\s*binh thanh'), 'Phường Bình Thạnh'],
   ]
   for (const [pattern, targetWard] of directWardMap) {
-    if (pattern.test(normalizedText)) {
-      ward = targetWard
-      break
+    if (pattern.test(foldedScope)) {
+      return targetWard
     }
   }
 
-  // 2. Ánh xạ 20 phường cũ -> 5 phường mới 2026
-  if (!ward) {
-    const oldWardMatch = normalizedText.match(/(?<![\p{L}\p{N}])(?:phường|p\.?)\s*0?(\d{1,2})(?![\p{L}\p{N}])/iu)
-    if (oldWardMatch) {
-      const oldNum = Number(oldWardMatch[1])
-      if (OLD_WARD_TO_2026[oldNum]) {
-        ward = OLD_WARD_TO_2026[oldNum]
-        suggestions.push(`Đã quy đổi Phường ${oldNum} cũ sang ${ward} (2026).`)
-      }
+  // 2. Quy đổi 20 phường cũ (Phường 17, P.17, P17, F17, f.25, phuong 14...) -> 5 phường mới 2026
+  const oldWardMatch = foldedScope.match(/(?<![a-z0-9])(?:phuong|p\.?|f\.?)\s*0?(\d{1,2})(?![a-z0-9])/i)
+  if (oldWardMatch) {
+    const oldNum = Number(oldWardMatch[1])
+    if (OLD_WARD_TO_2026[oldNum]) {
+      const mapped = OLD_WARD_TO_2026[oldNum]
+      suggestions.push(`Đã quy đổi Phường ${oldNum} cũ sang ${mapped} (2026).`)
+      return mapped
     }
   }
 
-  // 3. Tìm dòng địa chỉ cụ thể
+  // 3. Địa danh / trường học / khu vực đặc trưng (rất chính xác kể cả khi nằm trên trục đường dài)
+  for (const entry of LANDMARK_TO_WARD_2026) {
+    if (entry.pattern.test(foldedScope)) {
+      suggestions.push(`Tự nhận diện ${entry.ward} theo địa danh/khu vực — vui lòng kiểm tra lại.`)
+      return entry.ward
+    }
+  }
+
+  // 4. Tuyến đường nằm gọn trong 1 phường 2026
+  for (const entry of STREET_TO_WARD_2026) {
+    if (entry.pattern.test(foldedScope)) {
+      suggestions.push(`Gợi ý ${entry.ward} theo tên đường — vui lòng kiểm tra lại.`)
+      return entry.ward
+    }
+  }
+
+  return ''
+}
+
+function isLikelyAddressLine(line) {
+  const folded = foldVi(line)
+  if (/^(?:lh|lien he|goi|call|zalo|ib|inbox|chi|gia|cho thue)\b/.test(folded)) return false
+  if (/^(?:d\/c|dc|dia chi)\s*[:\-]?\s*/i.test(folded)) return true
+  const hasKnownStreet =
+    STREET_TO_WARD_2026.some((entry) => entry.pattern.test(folded)) ||
+    MULTI_WARD_STREETS.test(folded) ||
+    LANDMARK_TO_WARD_2026.some((entry) => entry.pattern.test(folded))
+  const hasHouseNumber = /^\d+(?:\/\d+[A-Za-z]?)?\s+[^\d,]+/.test(line)
+  const hasLocationCue = asciiWord('binh thanh|q\\.?\\s*binh thanh|q\\.?\\s*bt|duong|hem|phuong|p\\.?\\s*\\d+|f\\.?\\s*\\d+').test(folded)
+
+  if (hasHouseNumber && (hasKnownStreet || hasLocationCue || /^[0-9/]+\s+[a-z\s]{4,}/i.test(folded))) {
+    return true
+  }
+  return hasKnownStreet && hasLocationCue
+}
+
+function extractWardAndAddresses(cleanLines, normalizedText) {
+  const suggestions = []
+
+  // Tìm dòng địa chỉ cụ thể
   let addressLine = ''
   for (const rawLine of cleanLines) {
     const line = applyStreetFixes(rawLine.replace(/^-+\s*/, '').trim())
-    if (/^(?:lh|liên hệ|gọi|call|zalo|ib|inbox)(?![\p{L}\p{N}])/iu.test(line)) continue
-    const hasAddressPrefix = /^(?:đ\/c|đc|địa chỉ)\s*[:\-]?\s*/iu.test(line)
-    const hasHouseNumberAndStreet = /^\d+(?:\/\d+[A-Za-z]?)?\s+[^\d,]+/.test(line)
-    const hasDistrictOrStreet = uWord('bình thạnh|đường|hẻm|phường').test(line) || STREET_TO_WARD_2026.some((entry) => entry.pattern.test(line))
-    if (hasAddressPrefix || (hasHouseNumberAndStreet && hasDistrictOrStreet) || (uWord('bình thạnh').test(line) && !/^\s*chỉ(?![\p{L}\p{N}])/iu.test(line))) {
-      addressLine = line.replace(/^(?:đ\/c|đc|địa chỉ)\s*[:\-]?\s*/iu, '').trim()
+    if (isLikelyAddressLine(line)) {
+      addressLine = line.replace(/^(?:đ\/c|đc|địa chỉ|d\/c|dc|dia chi)\s*[:\-]?\s*/iu, '').trim()
       break
     }
   }
 
-  // 4. Nếu chưa có ward, thử suy luận theo tên đường ngắn đặc trưng
+  // Ưu tiên phân tích trên địa chỉ cụ thể trước, sau đó trên toàn bài (để bắt được cả địa danh/phường ở dòng tiêu đề như "gần Hàng Xanh")
+  const foldedAddress = foldVi(addressLine)
+  const foldedFull = foldVi(normalizedText)
+  let ward = addressLine ? resolveWardFromText(foldedAddress, suggestions) : ''
   if (!ward) {
-    const scope = addressLine || normalizedText
-    for (const entry of STREET_TO_WARD_2026) {
-      if (entry.pattern.test(scope)) {
-        ward = entry.ward
-        suggestions.push(`Gợi ý ${ward} theo tên đường — vui lòng kiểm tra lại.`)
-        break
-      }
-    }
-    if (!ward && MULTI_WARD_STREETS.test(scope)) {
-      suggestions.push('Tuyến đường này đi qua nhiều phường — vui lòng tự chọn Phường.')
-    }
+    ward = resolveWardFromText(foldedFull, suggestions)
   }
 
   const privateAddress = addressLine ? addressLine.slice(0, 500) : ''
@@ -352,7 +450,7 @@ function extractWardAndAddresses(cleanLines, normalizedText) {
     const firstPart = addressLine.split(',')[0].trim()
     const withoutNumber = firstPart.replace(/^\d+(?:\/\d+[A-Za-z]?)?\s+/, '').trim()
     if (withoutNumber.length >= 4) {
-      publicAddress = /^(?:đường|hẻm|khu|gần|cư xá)/iu.test(withoutNumber)
+      publicAddress = /^(?:đường|hẻm|khu|gần|cư xá|duong|hem)/iu.test(withoutNumber)
         ? withoutNumber
         : `Đường ${withoutNumber}`
     }
@@ -366,8 +464,13 @@ function extractWardAndAddresses(cleanLines, normalizedText) {
     } else if (!publicAddress) {
       publicAddress = `${landmark}, Bình Thạnh`
     }
-  } else if (publicAddress && !uWord('bình thạnh').test(publicAddress)) {
+  } else if (publicAddress && !uWord('bình thạnh|binh thanh').test(publicAddress)) {
     publicAddress = `${publicAddress}, Bình Thạnh`
+  }
+
+  const needsRemoteWardLookup = !ward && Boolean(addressLine || publicAddress)
+  if (needsRemoteWardLookup && MULTI_WARD_STREETS.test(foldedAddress || foldedFull)) {
+    suggestions.push('Tuyến đường này đi qua nhiều phường — hệ thống sẽ thử tra cứu theo số nhà hoặc bạn tự chọn Phường.')
   }
 
   return {
@@ -375,6 +478,8 @@ function extractWardAndAddresses(cleanLines, normalizedText) {
     privateAddress,
     publicAddress: publicAddress.slice(0, 300),
     suggestions,
+    needsRemoteWardLookup,
+    lookupAddressQuery: addressLine || publicAddress,
   }
 }
 
@@ -382,7 +487,7 @@ function buildTitle({ cleanLines, roomType, amenities, publicAddress, privateAdd
   const firstLine = applyStreetFixes(cleanLines[0] || '')
     .replace(/^-+\s*/, '')
     // Bỏ cụm mở đầu kiểu "Chỉ 4tr2", "Giá 4.2tr/tháng" khỏi tiêu đề
-    .replace(/^(?:chỉ|giá|cho thuê|chdv|còn phòng)\s*(?:từ\s*)?(?:\d{1,2}\s*(?:tr|triệu|trieu)\s*\d{0,2}|\d{1,2}[.,]\d{1,2}\s*(?:tr|triệu)|\d{1,2}[.,]\d{3}[.,]\d{3}\s*(?:đ|vnd)?|\d{3,4}k)(?:\s*\/\s*(?:tháng|th|month))?/iu, '')
+    .replace(/^(?:chỉ|giá|cho thuê|chdv|còn phòng)\s*(?:từ\s*)?(?:\d{1,2}\s*(?:tr|triệu|trieu)\s*\d{0,3}|\d{1,2}[.,]\d{1,2}\s*(?:tr|triệu)|\d{1,2}[.,]\d{3}[.,]\d{3}\s*(?:đ|vnd)?|\d{3,4}k)(?:\s*\/\s*(?:tháng|th|month))?/iu, '')
     .replace(uWord('bancol|bancon', 'giu'), 'có ban công')
     .replace(/^[,.\-:\s]+/, '')
     .trim()
@@ -402,7 +507,7 @@ function buildTitle({ cleanLines, roomType, amenities, publicAddress, privateAdd
     parts.push(featureNote ? `${roomType} ${featureNote.toLowerCase()}` : roomType)
   }
 
-  if (streetChunk && !parts[0].toLowerCase().includes(streetChunk.toLowerCase())) {
+  if (streetChunk && !foldVi(parts[0]).includes(foldVi(streetChunk.replace(/^đường\s+/iu, '')))) {
     parts.push(streetChunk)
   }
 
@@ -464,7 +569,14 @@ export function parseRoomPostText(rawText) {
   const areaM2 = extractAreaM2(textWithoutPhones)
   const roomType = extractRoomType(normalizedText)
   const amenities = cleanText ? extractAmenities(normalizedText) : []
-  const { ward, privateAddress, publicAddress, suggestions } = extractWardAndAddresses(cleanLines, normalizedText)
+  const {
+    ward,
+    privateAddress,
+    publicAddress,
+    suggestions,
+    needsRemoteWardLookup,
+    lookupAddressQuery,
+  } = extractWardAndAddresses(cleanLines, normalizedText)
   const description = buildCleanDescription(cleanLines)
   const title = buildTitle({ cleanLines, roomType, amenities, publicAddress, privateAddress })
 
@@ -506,5 +618,7 @@ export function parseRoomPostText(rawText) {
     removedNoise,
     missingFields,
     suggestions,
+    needsRemoteWardLookup,
+    lookupAddressQuery,
   }
 }

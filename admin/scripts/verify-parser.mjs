@@ -235,6 +235,35 @@ Lh 0947832801 Toàn để xem phòng sớm nhất ạ
       assert.ok(resOnlySharedKitchen.fields.amenities.includes('Chỗ để xe'))
     },
   },
+  {
+    name: 'T19 - Nhận diện địa chỉ & phường không dấu, viết tắt P17 / F25 / phuong',
+    run() {
+      assert.equal(parseRoomPostText('Phong 4tr 20m2 18 nguyen cua van, f17, binh thanh 0901234567').fields.ward, 'Phường Gia Định')
+      assert.equal(parseRoomPostText('Phong 4tr 20m2 120 vo oanh, p25 0901234567').fields.ward, 'Phường Thạnh Mỹ Tây')
+      assert.equal(parseRoomPostText('Phong 4tr 20m2 phuong binh loi trung 0901234567').fields.ward, 'Phường Bình Lợi Trung')
+      assert.equal(parseRoomPostText('Phong 4tr 20m2 P. Binh Thanh 0901234567').fields.ward, 'Phường Bình Thạnh')
+    },
+  },
+  {
+    name: 'T20 - Nhận diện phường 2026 qua địa danh (Hàng Xanh, Văn Lang, BX Miền Đông, Bà Chiểu, Thanh Đa)',
+    run() {
+      assert.equal(parseRoomPostText('Phòng 4tr 20m2 412 Xô Viết Nghệ Tĩnh gần Ngã tư Hàng Xanh 0901234567').fields.ward, 'Phường Thạnh Mỹ Tây')
+      assert.equal(parseRoomPostText('Phòng 3tr5 18m2 gần ĐH Văn Lang cơ sở 3 0901234567').fields.ward, 'Phường Bình Lợi Trung')
+      assert.equal(parseRoomPostText('Phòng 3tr8 20m2 sau BX Miền Đông 0901234567').fields.ward, 'Phường Bình Thạnh')
+      assert.equal(parseRoomPostText('Phòng 4tr 20m2 gần Chợ Bà Chiểu 0901234567').fields.ward, 'Phường Gia Định')
+      assert.equal(parseRoomPostText('Phòng 3tr 18m2 Cư xá Thanh Đa 0901234567').fields.ward, 'Phường Bình Quới')
+    },
+  },
+  {
+    name: 'T21 - Trục đường dài không ghi "Bình Thạnh" vẫn trích xuất địa chỉ và bật cờ tra bản đồ từ xa',
+    run() {
+      const res = parseRoomPostText('Chỉ 4tr2 Phòng ban công 22m2\n- 412 Xô Viết Nghệ Tĩnh\nLh 0947832801')
+      assert.equal(res.fields.privateAddress, '412 Xô Viết Nghệ Tĩnh')
+      assert.equal(res.fields.publicAddress, 'Đường Xô Viết Nghệ Tĩnh, Bình Thạnh')
+      assert.equal(res.needsRemoteWardLookup, true)
+      assert.equal(res.lookupAddressQuery, '412 Xô Viết Nghệ Tĩnh')
+    },
+  },
 ]
 
 let passed = 0
