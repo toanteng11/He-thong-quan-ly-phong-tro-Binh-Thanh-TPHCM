@@ -1818,19 +1818,19 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 6px 16px 6px 8px;
+  padding: 6px 15px 6px 8px;
   color: #FFFFFF;
-  background: linear-gradient(135deg, #247A5D 0%, #154D3A 55%, #0D3427 100%);
-  border: 2px solid #A7F3D0;
+  background: linear-gradient(135deg, rgb(36 122 93 / 78%) 0%, rgb(21 77 58 / 82%) 55%, rgb(13 52 39 / 86%) 100%);
+  border: 1.5px solid rgb(167 243 208 / 65%);
   border-radius: var(--radius-pill);
-  box-shadow:
-    0 12px 28px rgb(21 77 58 / 30%),
-    0 0 0 4px rgb(167 243 208 / 28%);
+  box-shadow: 0 8px 20px rgb(21 77 58 / 18%);
+  backdrop-filter: blur(8px);
+  opacity: 0.72;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   animation: botFloat 3.2s ease-in-out infinite;
-  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease;
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, background 0.2s ease;
 }
 
 .consult-bot-launcher::after {
@@ -1841,6 +1841,14 @@ textarea:focus-visible {
   transform: translateX(-120%);
   animation: botSheen 4.5s ease-in-out infinite;
   pointer-events: none;
+}
+
+.consult-bot-launcher:hover,
+.consult-bot-launcher:focus-visible,
+.consult-bot-launcher.is-open {
+  opacity: 1;
+  background: linear-gradient(135deg, #247A5D 0%, #154D3A 55%, #0D3427 100%);
+  border-color: #A7F3D0;
 }
 
 .consult-bot-launcher:hover {
