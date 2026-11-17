@@ -12,7 +12,7 @@ const {
 
 const router = Router();
 
-const ROOM_TYPES = ["Phòng trọ", "Phòng có gác", "Phòng studio", "Căn hộ mini", "Phòng ở ghép"];
+const ROOM_TYPES = ["Phòng có gác", "Phòng studio", "Phòng ở ghép"];
 const BINH_THANH_2026_WARDS = [
   "Phường Gia Định",
   "Phường Bình Thạnh",
@@ -540,9 +540,9 @@ function parseChatIntent(foldedMsg) {
 
   let roomTypeHint = "";
   if (foldedMsg.includes("studio")) roomTypeHint = "Phòng studio";
-  else if (foldedMsg.includes("can ho") || foldedMsg.includes("mini") || foldedMsg.includes("chdv")) roomTypeHint = "Căn hộ mini";
   else if (foldedMsg.includes("o ghep")) roomTypeHint = "Phòng ở ghép";
   else if (foldedMsg.includes("gac")) roomTypeHint = "Phòng có gác";
+  else if (foldedMsg.includes("can ho") || foldedMsg.includes("mini") || foldedMsg.includes("chdv")) roomTypeHint = "Phòng studio";
 
   const featureKeywords = [];
   if (foldedMsg.includes("khong chung chu") || foldedMsg.includes("ko chung chu")) featureKeywords.push("khong chung chu");

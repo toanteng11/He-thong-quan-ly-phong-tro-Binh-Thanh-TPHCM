@@ -6,7 +6,7 @@ export const BINH_THANH_WARDS = [
   'Phường Bình Quới',
 ]
 
-export const ROOM_TYPES = ['Phòng trọ', 'Phòng có gác', 'Phòng studio', 'Căn hộ mini', 'Phòng ở ghép']
+export const ROOM_TYPES = ['Phòng có gác', 'Phòng studio', 'Phòng ở ghép']
 
 export const AMENITIES = [
   'Máy lạnh',
@@ -336,10 +336,10 @@ function extractAreaM2(textWithoutPhones) {
 
 function extractRoomType(text) {
   if (uWord('studio').test(text)) return 'Phòng studio'
-  if (uWord('căn hộ mini|căn hộ dịch vụ|chdv').test(text)) return 'Căn hộ mini'
   if (uWord('ở ghép|tìm bạn ở ghép|share phòng').test(text)) return 'Phòng ở ghép'
   if (uWord('có gác|dạng gác|gác lửng|gác cao|phòng gác|gác').test(text)) return 'Phòng có gác'
-  return 'Phòng trọ'
+  if (uWord('căn hộ mini|căn hộ dịch vụ|chdv').test(text)) return 'Phòng studio'
+  return ''
 }
 
 function extractAmenities(text) {

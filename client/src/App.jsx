@@ -5,7 +5,7 @@ import { api } from './lib/api.js'
 import { branding } from './branding.js'
 import './App.css'
 
-const ROOM_TYPES = ['Phòng trọ', 'Phòng có gác', 'Phòng studio', 'Căn hộ mini', 'Phòng ở ghép']
+const ROOM_TYPES = ['Phòng có gác', 'Phòng studio', 'Phòng ở ghép']
 const DEFAULT_AMENITIES = [
   'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Giường', 'Tủ quần áo', 'Bếp riêng',
   'Nhà vệ sinh riêng', 'Ban công', 'Gác lửng', 'Wifi', 'Chỗ để xe', 'Cửa sổ',

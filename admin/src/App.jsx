@@ -1964,12 +1964,20 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                 id="field-roomType"
               >
                 <span>Loại phòng <b>*</b></span>
-                <select value={form.roomType} onChange={(e) => update('roomType', e.target.value)}>
+                <select
+                  value={ROOM_TYPES.includes(form.roomType) ? form.roomType : ''}
+                  onChange={(e) => update('roomType', e.target.value)}
+                >
                   <option value="">Chọn loại phòng</option>
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
+                {form.roomType && !ROOM_TYPES.includes(form.roomType) && (
+                  <span className="field-hint">
+                    Phân loại cũ (&ldquo;{form.roomType}&rdquo;) đã được gỡ bỏ — vui lòng chọn lại loại phòng mới khi lưu.
+                  </span>
+                )}
                 {fieldError('roomType')}
                 {missingHint('roomType')}
               </label>
