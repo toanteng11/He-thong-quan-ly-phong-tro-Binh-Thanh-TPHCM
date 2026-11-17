@@ -92,10 +92,30 @@ const AMENITY_RULES = [
   { name: 'Bếp riêng', patterns: [uWord('bếp riêng|kệ bếp|tủ bếp|bếp nấu|bep rieng')] },
   { name: 'Nhà vệ sinh riêng', patterns: [uWord('nhà vệ sinh riêng|vệ sinh riêng|wc riêng|tolet riêng|toilet riêng|nvs riêng|khép kín')] },
   { name: 'Ban công', patterns: [uWord('ban công|bancol|bancon|ban cong|balcony')] },
-  { name: 'Gác lửng', patterns: [uWord('gác lửng|có gác|gác cao|phòng gác|gac lung')] },
+  { name: 'Gác lửng', patterns: [uWord('gác lửng|dạng gác|có gác|gác cao|phòng gác|gac lung|gác')] },
   { name: 'Wifi', patterns: [uWord('wifi|wi-fi|internet')] },
   { name: 'Chỗ để xe', patterns: [uWord('chỗ để xe|để xe|bãi xe|nhà xe|hầm xe|giữ xe')] },
   { name: 'Cửa sổ', patterns: [uWord('cửa sổ|cua so|thoáng mát|sạch sẽ thoáng|nhiều sáng|giếng trời')] },
+]
+
+// 4 tiện nghi mặc định luôn tick trừ khi bài viết ghi rõ dùng chung / không có
+const DEFAULT_ON_AMENITY_EXCLUSIONS = [
+  {
+    name: 'Nhà vệ sinh riêng',
+    excludePattern: uWord('wc chung|vệ sinh chung|nhà vệ sinh chung|toilet chung|tolet chung|nvs chung|chung wc|chung toilet|chung tolet|dùng chung vệ sinh|share wc'),
+  },
+  {
+    name: 'Chỗ để xe',
+    excludePattern: uWord('không chỗ để xe|không có chỗ để xe|ko chỗ để xe|ko có chỗ để xe|không để xe|ko để xe|không giữ xe|ko giữ xe|tự gửi xe|gửi xe ngoài'),
+  },
+  {
+    name: 'Wifi',
+    excludePattern: uWord('không wifi|không có wifi|ko wifi|ko có wifi|chưa có wifi|không internet'),
+  },
+  {
+    name: 'Bếp riêng',
+    excludePattern: uWord('bếp chung|chung bếp|nấu ăn chung|dùng chung bếp|không nấu ăn|ko nấu ăn|không cho nấu ăn|ko cho nấu ăn|cấm nấu ăn|không bếp|ko bếp'),
+  },
 ]
 
 const DEPOSIT_OR_FEE_LOOKBEHIND = /(?:cọc|đặt cọc|dat coc|điện|dien|nước|nuoc|rác|rac|wifi|net|xe|phí|phi|dịch vụ|dich vu)\s*[:=\-]?\s*$/iu
@@ -179,12 +199,22 @@ function isPrecededByDepositOrFee(text, matchIndex) {
 function extractPriceVnd(textWithoutPhones) {
   const candidates = []
 
-  // Dạng: 4tr2, 4tr25, 4 triệu 5 (không nuốt số của 20m2 / 24m2)
-  for (const m of textWithoutPhones.matchAll(/(\d{1,2})\s*(?:tr|triệu|trieu)\s*(\d{1,2})(?![\p{L}\p{N}])(?!\s*(?:m2|m²|mét|met|phòng|người))/giu)) {
+  // Dạng dính liền: 3tr9, 4tr2, 2tr7, 4tr25, 4tr500 (không bị từ "Phòng" phía sau chặn)
+  for (const m of textWithoutPhones.matchAll(/(\d{1,2})\s*(?:tr|triệu|trieu)(\d{1,3})(?![\p{L}\p{N}])/giu)) {
     const major = Number(m[1])
     const decStr = m[2]
-    const minor = decStr.length === 1 ? Number(decStr) * 100_000 : Number(decStr) * 10_000
-    candidates.push({ index: m.index ?? 0, priority: 3, value: major * 1_000_000 + minor })
+    const minor =
+      decStr.length === 1
+        ? Number(decStr) * 100_000
+        : decStr.length === 2
+          ? Number(decStr) * 10_000
+          : Number(decStr) * 1_000
+    candidates.push({ index: m.index ?? 0, priority: 4, value: major * 1_000_000 + minor })
+  }
+
+  // Dạng có khoảng trắng: "4 triệu 5" (tránh nuốt số của "4tr 20m2" hoặc "4tr 2 phòng")
+  for (const m of textWithoutPhones.matchAll(/(\d{1,2})\s*(?:tr|triệu|trieu)\s+(\d)(?![\p{L}\p{N}])(?!\s*(?:m2|m²|mét|met|phòng|người))/giu)) {
+    candidates.push({ index: m.index ?? 0, priority: 3, value: Number(m[1]) * 1_000_000 + Number(m[2]) * 100_000 })
   }
 
   // Dạng: 4.2tr, 4,5 triệu, 4.2 củ
@@ -233,18 +263,25 @@ function extractRoomType(text) {
   if (uWord('studio').test(text)) return 'Phòng studio'
   if (uWord('căn hộ mini|căn hộ dịch vụ|chdv').test(text)) return 'Căn hộ mini'
   if (uWord('ở ghép|tìm bạn ở ghép|share phòng').test(text)) return 'Phòng ở ghép'
-  if (uWord('có gác|gác lửng|gác cao|phòng gác').test(text)) return 'Phòng có gác'
+  if (uWord('có gác|dạng gác|gác lửng|gác cao|phòng gác|gác').test(text)) return 'Phòng có gác'
   return 'Phòng trọ'
 }
 
 function extractAmenities(text) {
-  const matched = []
+  const matched = new Set()
   for (const rule of AMENITY_RULES) {
     if (rule.patterns.some((pattern) => pattern.test(text))) {
-      matched.push(rule.name)
+      matched.add(rule.name)
     }
   }
-  return matched
+  for (const defRule of DEFAULT_ON_AMENITY_EXCLUSIONS) {
+    if (defRule.excludePattern.test(text)) {
+      matched.delete(defRule.name)
+    } else {
+      matched.add(defRule.name)
+    }
+  }
+  return AMENITIES.filter((name) => matched.has(name))
 }
 
 function extractWardAndAddresses(cleanLines, normalizedText) {
@@ -426,7 +463,7 @@ export function parseRoomPostText(rawText) {
   const priceVnd = extractPriceVnd(textWithoutPhones)
   const areaM2 = extractAreaM2(textWithoutPhones)
   const roomType = extractRoomType(normalizedText)
-  const amenities = extractAmenities(normalizedText)
+  const amenities = cleanText ? extractAmenities(normalizedText) : []
   const { ward, privateAddress, publicAddress, suggestions } = extractWardAndAddresses(cleanLines, normalizedText)
   const description = buildCleanDescription(cleanLines)
   const title = buildTitle({ cleanLines, roomType, amenities, publicAddress, privateAddress })

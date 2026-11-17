@@ -181,7 +181,58 @@ const tests = [
       const rEmpty = parseRoomPostText('')
       assert.equal(rEmpty.fields.priceVnd, null)
       assert.equal(rEmpty.fields.areaM2, null)
+      assert.equal(rEmpty.fields.amenities.length, 0)
       assert.ok(rEmpty.missingFields.length >= 5)
+    },
+  },
+  {
+    name: 'T16 - Bài mẫu thực tế mới: 3tr9 Phòng dạng gác, 139 Đinh Bộ Lĩnh + 4 tiện nghi mặc định',
+    run() {
+      const sample2 = `Chỉ☝️3tr9☝️ Phòng dạng gác ,  sạch sẽ  , đường Đinh Bộ Lĩnh  
+
+- 139  Đinh Bộ Lĩnh  , Bình Thạnh 
+-  mới sạch sẽ như hình  
+- không chung chủ ,giờ giấc tự do , ra vào vân tay 
+
+Lh 0947832801 Toàn để xem phòng sớm nhất ạ
+
+#phongtrobinhthanh
+#phongtrogiare`
+      const res = parseRoomPostText(sample2)
+      assert.equal(res.fields.priceVnd, 3900000)
+      assert.equal(res.fields.roomType, 'Phòng có gác')
+      assert.equal(res.fields.ward, 'Phường Bình Thạnh')
+      assert.equal(res.fields.privateAddress, '139 Đinh Bộ Lĩnh, Bình Thạnh')
+      assert.equal(res.fields.contactPhone, '0947832801')
+      assert.ok(res.fields.amenities.includes('Gác lửng'))
+      assert.ok(res.fields.amenities.includes('Nhà vệ sinh riêng'))
+      assert.ok(res.fields.amenities.includes('Chỗ để xe'))
+      assert.ok(res.fields.amenities.includes('Wifi'))
+      assert.ok(res.fields.amenities.includes('Bếp riêng'))
+    },
+  },
+  {
+    name: 'T17 - Giá 4tr, 2tr7, 4tr500 đứng ngay trước chữ Phòng đều nhận đúng',
+    run() {
+      assert.equal(parseRoomPostText('Chỉ☝️4tr☝️ Phòng đẹp 20m2 Đinh Bộ Lĩnh 0901234567').fields.priceVnd, 4000000)
+      assert.equal(parseRoomPostText('Chỉ☝️2tr7☝️ Phòng sinh viên 18m2 P.17 0901234567').fields.priceVnd, 2700000)
+      assert.equal(parseRoomPostText('Chỉ 4tr500 Phòng ban công 22m2 P.25 0901234567').fields.priceVnd, 4500000)
+    },
+  },
+  {
+    name: 'T18 - Không tick tiện nghi mặc định khi bài có ghi wc chung / bếp chung / không wifi / không chỗ để xe',
+    run() {
+      const res = parseRoomPostText('Phòng 2tr5 16m2 P.17, wc chung, bếp chung, không wifi, không chỗ để xe. LH 0901234567')
+      assert.ok(!res.fields.amenities.includes('Nhà vệ sinh riêng'))
+      assert.ok(!res.fields.amenities.includes('Bếp riêng'))
+      assert.ok(!res.fields.amenities.includes('Wifi'))
+      assert.ok(!res.fields.amenities.includes('Chỗ để xe'))
+
+      const resOnlySharedKitchen = parseRoomPostText('Phòng 3tr 18m2 P.17, bếp chung, còn lại tự do. LH 0901234567')
+      assert.ok(!resOnlySharedKitchen.fields.amenities.includes('Bếp riêng'))
+      assert.ok(resOnlySharedKitchen.fields.amenities.includes('Nhà vệ sinh riêng'))
+      assert.ok(resOnlySharedKitchen.fields.amenities.includes('Wifi'))
+      assert.ok(resOnlySharedKitchen.fields.amenities.includes('Chỗ để xe'))
     },
   },
 ]
