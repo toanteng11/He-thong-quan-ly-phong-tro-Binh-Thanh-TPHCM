@@ -1036,16 +1036,26 @@ function PublicCatalogPage({ location, navigate }) {
 
 function PublicRoomCard({ room, navigate, priority = false }) {
   const detailPath = `/rooms/${room.id}`
+  const isFeatured = Boolean(room.isRecommended) && room.availability === 'AVAILABLE'
   const locationText = [room.publicAddress, room.ward, room.district].filter(Boolean).join(', ') || 'Quận Bình Thạnh'
   const visibleAmenities = (room.amenities || []).slice(0, 3)
   const extraAmenities = Math.max(0, (room.amenities || []).length - 3)
 
   return (
-    <article className={`public-room-card${room.availability === 'RENTED' ? ' is-rented' : ''}`}>
+    <article
+      className={`public-room-card${room.availability === 'RENTED' ? ' is-rented' : ''}${isFeatured ? ' is-recommended' : ''}`}
+    >
       <AppLink to={detailPath} navigate={navigate} className="card-media-link" aria-label={`Xem chi tiết ${room.title}`}>
         <SafeImage src={room.coverImageUrl} alt={room.title} priority={priority} fallbackLabel="Ảnh phòng đang cập nhật" />
         <div className="card-media-badges">
-          <StatusBadge status={room.availability} />
+          <div className="card-media-badges-left">
+            <StatusBadge status={room.availability} />
+            {isFeatured && (
+              <span className="recommended-badge">
+                <Icon name="star" size={11} filled /> Đề xuất
+              </span>
+            )}
+          </div>
           {room.roomType && <span className="card-type-pill">{room.roomType}</span>}
         </div>
       </AppLink>
@@ -1483,6 +1493,11 @@ function PublicRoomDetailPage({ roomId, navigate, backPath }) {
               <aside className="detail-summary-card">
                 <div className="detail-summary-badges">
                   <StatusBadge status={item.availability} />
+                  {item.isRecommended && item.availability === 'AVAILABLE' && (
+                    <span className="recommended-badge">
+                      <Icon name="star" size={12} filled /> Đề xuất
+                    </span>
+                  )}
                   {item.roomType && <span className="room-type-pill">{item.roomType}</span>}
                 </div>
 

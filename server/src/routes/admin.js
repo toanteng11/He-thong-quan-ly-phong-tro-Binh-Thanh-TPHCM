@@ -53,6 +53,7 @@ const editableListingSchema = z.object({
   allowPublicPhone: z.boolean(),
   contactZalo: z.string().max(120),
   allowPublicZalo: z.boolean(),
+  isRecommended: z.boolean().default(false),
   version: z.number().int().positive().optional(),
 }).strict();
 
@@ -148,6 +149,7 @@ function toListing(doc, explicitImages) {
     allowPublicPhone: Boolean(doc.allowPublicPhone),
     contactZalo: doc.contactZalo ?? "",
     allowPublicZalo: Boolean(doc.allowPublicZalo),
+    isRecommended: Boolean(doc.isRecommended),
     availability: doc.availability,
     publishStatus: doc.publishStatus,
     publishedAt: doc.publishedAt || null,
@@ -581,6 +583,7 @@ router.get("/rooms", async (request, response, next) => {
       q: z.string().trim().max(100).optional().default(""),
       publishStatus: z.enum(["DRAFT", "PUBLISHED", "HIDDEN"]).optional(),
       availability: z.enum(["AVAILABLE", "RENTED"]).optional(),
+      isRecommended: z.enum(["true", "false"]).optional(),
       page: z.coerce.number().int().min(1).default(1),
       pageSize: z.coerce.number().int().min(1).max(48).default(12),
       sort: z.enum(["updatedAt_desc", "price_asc", "price_desc"]).default("updatedAt_desc"),
@@ -594,9 +597,16 @@ router.get("/rooms", async (request, response, next) => {
     }
     if (query.data.publishStatus) match.publishStatus = query.data.publishStatus;
     if (query.data.availability) match.availability = query.data.availability;
+    if (query.data.isRecommended === "true") match.isRecommended = true;
+    else if (query.data.isRecommended === "false") match.isRecommended = { $ne: true };
 
     const { roomListings } = await getCollections();
     const totalItems = await roomListings.countDocuments(match);
+    const recommendedAvailableCount = await roomListings.countDocuments({
+      deletedAt: null,
+      availability: "AVAILABLE",
+      isRecommended: true,
+    });
     const totalPages = Math.ceil(totalItems / query.data.pageSize);
     const skip = (query.data.page - 1) * query.data.pageSize;
 
@@ -635,6 +645,7 @@ router.get("/rooms", async (request, response, next) => {
       pageSize: query.data.pageSize,
       totalItems,
       totalPages,
+      recommendedAvailableCount,
     });
   } catch (error) {
     return next(error);
@@ -696,6 +707,7 @@ router.post("/rooms", async (request, response, next) => {
       allowPublicPhone: data.allowPublicPhone,
       contactZalo: data.contactZalo,
       allowPublicZalo: data.allowPublicZalo,
+      isRecommended: Boolean(data.isRecommended),
       availability: data.availability,
       publishStatus: "DRAFT",
       publishedAt: null,
@@ -773,6 +785,7 @@ router.put("/rooms/:roomId", async (request, response, next) => {
           allowPublicPhone: data.allowPublicPhone,
           contactZalo: data.contactZalo,
           allowPublicZalo: data.allowPublicZalo,
+          isRecommended: Boolean(data.isRecommended),
           updatedBy: request.admin.id,
           updatedAt: now,
         },
@@ -818,6 +831,36 @@ router.patch("/rooms/:roomId/availability", async (request, response, next) => {
     if (!updated) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy tin phòng.");
     await audit(request, "availability_changed", "room_listing", request.params.roomId, {
       availability: parsed.data.availability,
+    });
+    return response.json({ item: toListing(updated, []) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/rooms/:roomId/recommended", async (request, response, next) => {
+  try {
+    if (!UUID.test(request.params.roomId)) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy tin phòng.");
+    const parsed = z.object({ isRecommended: z.boolean() }).safeParse(request.body);
+    if (!parsed.success) return sendError(response, request, 400, "INVALID_INPUT", "Trạng thái đề xuất chưa hợp lệ.");
+
+    const { roomListings } = await getCollections();
+    const updated = await roomListings.findOneAndUpdate(
+      { _id: request.params.roomId, deletedAt: null },
+      {
+        $set: {
+          isRecommended: parsed.data.isRecommended,
+          updatedAt: new Date(),
+          updatedBy: request.admin.id,
+        },
+        $inc: { version: 1 },
+      },
+      { returnDocument: "after" },
+    );
+
+    if (!updated) return sendError(response, request, 404, "NOT_FOUND", "Không tìm thấy tin phòng.");
+    await audit(request, "recommended_changed", "room_listing", request.params.roomId, {
+      isRecommended: parsed.data.isRecommended,
     });
     return response.json({ item: toListing(updated, []) });
   } catch (error) {

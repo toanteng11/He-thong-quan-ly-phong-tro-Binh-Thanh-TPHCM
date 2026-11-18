@@ -32,6 +32,7 @@ const emptyListing = {
   title: '', description: '', roomType: '', priceVnd: null, areaM2: null, amenities: [],
   ward: '', district: 'Bình Thạnh', city: 'TP. Hồ Chí Minh', publicAddress: '', privateAddress: '',
   allowExactAddress: false, contactPhone: '', allowPublicPhone: false, contactZalo: '', allowPublicZalo: false,
+  isRecommended: false,
 }
 const editableKeys = Object.keys(emptyListing)
 
@@ -796,7 +797,7 @@ function DashboardPage({ navigate }) {
 }
 
 function RoomListPage({ navigate, showNotice }) {
-  const [filters, setFilters] = useState({ q: '', publishStatus: '', availability: '' })
+  const [filters, setFilters] = useState({ q: '', publishStatus: '', availability: '', isRecommended: '' })
   const [applied, setApplied] = useState(filters)
   const [page, setPage] = useState(1)
   const [result, setResult] = useState(null)
@@ -879,6 +880,17 @@ function RoomListPage({ navigate, showNotice }) {
     }
   }
 
+  const toggleRecommended = async (room) => {
+    const nextVal = !room.isRecommended
+    try {
+      await api(`/admin/rooms/${room.id}/recommended`, { method: 'PATCH', json: { isRecommended: nextVal } })
+      showNotice(nextVal ? 'Đã ghim phòng lên đầu trang (★ Đề xuất).' : 'Đã bỏ ghim Đề xuất cho phòng này.')
+      load()
+    } catch (caught) {
+      setError(caught.message)
+    }
+  }
+
   const confirmDelete = async () => {
     if (!deleting) return
     try {
@@ -952,6 +964,18 @@ function RoomListPage({ navigate, showNotice }) {
             </select>
           </label>
 
+          <label className="filter-select">
+            <span className="sr-only">Mức đề xuất</span>
+            <select
+              value={filters.isRecommended}
+              onChange={(e) => setFilters({ ...filters, isRecommended: e.target.value })}
+            >
+              <option value="">Tất cả đề xuất</option>
+              <option value="true">Đang Đề xuất ★</option>
+              <option value="false">Phòng thường</option>
+            </select>
+          </label>
+
           <button className="button button-secondary filter-submit">Lọc kết quả</button>
         </form>
 
@@ -966,6 +990,12 @@ function RoomListPage({ navigate, showNotice }) {
 
         <div className="list-meta">
           <span>{busy ? 'Đang tải danh sách…' : `${result?.totalItems || 0} tin phòng`}</span>
+          {!busy && typeof result?.recommendedAvailableCount === 'number' && (
+            <span className={`recommended-counter${result.recommendedAvailableCount > 6 ? ' is-high' : ''}`}>
+              ★ Đang ghim Đề xuất (còn trống): <strong>{result.recommendedAvailableCount}</strong>
+              {result.recommendedAvailableCount > 6 ? ' — nên giữ tối đa 3–6 phòng để nổi bật hiệu quả' : ' (khuyên dùng 3–6 phòng)'}
+            </span>
+          )}
         </div>
 
         {busy ? (
@@ -976,26 +1006,27 @@ function RoomListPage({ navigate, showNotice }) {
             navigate={navigate}
             onPublishChange={changeStatus}
             onAvailabilityChange={changeAvailability}
+            onRecommendedToggle={toggleRecommended}
             onDelete={setDeleting}
           />
         ) : (
           <div className="empty-state">
             <span className="empty-illustration"><Icon name="search" size={28} /></span>
             <strong>
-              {applied.q || applied.publishStatus || applied.availability
+              {applied.q || applied.publishStatus || applied.availability || applied.isRecommended
                 ? 'Không tìm thấy tin phù hợp'
                 : 'Chưa có tin phòng nào'}
             </strong>
             <button
               className="button button-secondary"
               onClick={() => (
-                applied.q || applied.publishStatus || applied.availability
-                  ? (setFilters({ q: '', publishStatus: '', availability: '' }),
-                    setApplied({ q: '', publishStatus: '', availability: '' }))
+                applied.q || applied.publishStatus || applied.availability || applied.isRecommended
+                  ? (setFilters({ q: '', publishStatus: '', availability: '', isRecommended: '' }),
+                    setApplied({ q: '', publishStatus: '', availability: '', isRecommended: '' }))
                   : navigate('/rooms/new')
               )}
             >
-              {applied.q || applied.publishStatus || applied.availability
+              {applied.q || applied.publishStatus || applied.availability || applied.isRecommended
                 ? 'Xóa bộ lọc'
                 : (
                   <>
@@ -1039,7 +1070,7 @@ function RoomListPage({ navigate, showNotice }) {
   )
 }
 
-function RoomTable({ rows, navigate, compact = false, onPublishChange, onAvailabilityChange, onDelete }) {
+function RoomTable({ rows, navigate, compact = false, onPublishChange, onAvailabilityChange, onRecommendedToggle, onDelete }) {
   return (
     <div className={`room-table-wrap${compact ? ' compact-table' : ''}`}>
       <table className="room-table">
@@ -1069,6 +1100,12 @@ function RoomTable({ rows, navigate, compact = false, onPublishChange, onAvailab
                     <button onClick={() => navigate(`/rooms/${room.id}`)} className="room-name">
                       {room.title || 'Tin chưa có tiêu đề'}
                     </button>
+                    {room.isRecommended && (
+                      <span className={`admin-recommended-pill${room.availability === 'RENTED' ? ' is-dim' : ''}`}>
+                        <Icon name="star" size={11} filled />
+                        {room.availability === 'RENTED' ? 'Đề xuất (đã thuê — tạm hạ)' : 'Đề xuất'}
+                      </span>
+                    )}
                     <span>{[room.ward, room.district].filter(Boolean).join(', ') || 'Chưa nhập khu vực'}</span>
                   </div>
                 </div>
@@ -1112,6 +1149,18 @@ function RoomTable({ rows, navigate, compact = false, onPublishChange, onAvailab
               {!compact && (
                 <td>
                   <div className="row-actions">
+                    {onRecommendedToggle && (
+                      <button
+                        type="button"
+                        className={`icon-button${room.isRecommended ? ' is-recommended-star' : ''}`}
+                        title={room.isRecommended ? 'Bỏ ghim Đề xuất' : 'Ghim Đề xuất lên đầu trang'}
+                        aria-label={`${room.isRecommended ? 'Bỏ đề xuất' : 'Đề xuất'} ${room.title}`}
+                        aria-pressed={Boolean(room.isRecommended)}
+                        onClick={() => onRecommendedToggle(room)}
+                      >
+                        <Icon name="star" size={18} filled={Boolean(room.isRecommended)} />
+                      </button>
+                    )}
                     <button
                       className="icon-button"
                       title="Xem trước"
@@ -1166,11 +1215,26 @@ function RoomTable({ rows, navigate, compact = false, onPublishChange, onAvailab
             <div className="mobile-card-status">
               <StatusBadge status={room.availability} />
               <StatusBadge status={room.publishStatus} />
+              {room.isRecommended && (
+                <span className={`admin-recommended-pill${room.availability === 'RENTED' ? ' is-dim' : ''}`}>
+                  <Icon name="star" size={11} filled /> Đề xuất
+                </span>
+              )}
             </div>
             <div className="mobile-actions">
               <button className="button button-small button-secondary" onClick={() => navigate(`/rooms/${room.id}`)}>
                 <Icon name="edit" size={15} /> Sửa
               </button>
+              {onRecommendedToggle && !compact && (
+                <button
+                  type="button"
+                  className={`button button-small ${room.isRecommended ? 'button-recommended-active' : 'button-quiet'}`}
+                  onClick={() => onRecommendedToggle(room)}
+                >
+                  <Icon name="star" size={15} filled={Boolean(room.isRecommended)} />
+                  {room.isRecommended ? 'Bỏ đề xuất' : 'Đề xuất'}
+                </button>
+              )}
               {!compact && (
                 <button className="button button-small button-quiet" onClick={() => navigate(`/rooms/${room.id}/preview`)}>
                   <Icon name="eye" size={15} /> Xem
@@ -2041,6 +2105,19 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                 </select>
                 {fieldError('availability')}
               </label>
+
+              <div className="field field-span-2" id="field-isRecommended">
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.isRecommended)}
+                    onChange={(e) => update('isRecommended', e.target.checked)}
+                  />
+                  <span>
+                    <strong>Ghim Đề xuất lên đầu trang (★ Đề xuất)</strong> — tự động ưu tiên lên đầu khi phòng còn trống
+                  </span>
+                </label>
+              </div>
             </div>
           </section>
 

@@ -95,6 +95,7 @@ function toPublicListItem(doc) {
     city: doc.city,
     publicAddress: doc.publicAddress,
     availability: doc.availability,
+    isRecommended: Boolean(doc.isRecommended),
     publishedAt: doc.publishedAt || null,
     updatedAt: doc.updatedAt,
     coverImageUrl: coverImage ? `/api/v1/public/rooms/${doc._id}/images/${coverImage.id}/file` : null,
@@ -130,6 +131,7 @@ function toPublicDetailItem(doc) {
     displayAddress,
     ...(doc.allowExactAddress && exact ? { exactAddress: exact } : {}),
     availability: doc.availability,
+    isRecommended: Boolean(doc.isRecommended),
     publishedAt: doc.publishedAt || null,
     updatedAt: doc.updatedAt,
     contact,
@@ -251,8 +253,19 @@ router.get("/rooms", async (request, response, next) => {
         break;
       default:
         pipeline.push(
-          { $addFields: { availabilityRank: { $cond: [{ $eq: ["$availability", "AVAILABLE"] }, 0, 1] } } },
-          { $sort: { availabilityRank: 1, publishedAt: -1, updatedAt: -1, _id: 1 } },
+          {
+            $addFields: {
+              availabilityRank: { $cond: [{ $eq: ["$availability", "AVAILABLE"] }, 0, 1] },
+              recommendedRank: {
+                $cond: [
+                  { $and: [{ $eq: ["$availability", "AVAILABLE"] }, { $eq: ["$isRecommended", true] }] },
+                  0,
+                  1,
+                ],
+              },
+            },
+          },
+          { $sort: { availabilityRank: 1, recommendedRank: 1, publishedAt: -1, updatedAt: -1, _id: 1 } },
         );
         break;
     }
@@ -670,6 +683,9 @@ function evaluateRoomsForChat(docs, message) {
     if (intent.preferLarge && area > 0) {
       score += Math.min(20, Math.round(area / 2));
     }
+    if (doc.isRecommended) {
+      score += 6;
+    }
 
     return { doc, matchedCount, failedCount, score };
   });
@@ -678,6 +694,7 @@ function evaluateRoomsForChat(docs, message) {
     if (b.score !== a.score) return b.score - a.score;
     if (intent.preferCheap) return Number(a.doc.priceVnd || 0) - Number(b.doc.priceVnd || 0);
     if (intent.preferLarge) return Number(b.doc.areaM2 || 0) - Number(a.doc.areaM2 || 0);
+    if (Boolean(b.doc.isRecommended) !== Boolean(a.doc.isRecommended)) return b.doc.isRecommended ? 1 : -1;
     return new Date(b.doc.publishedAt || 0).getTime() - new Date(a.doc.publishedAt || 0).getTime();
   });
 
@@ -838,6 +855,7 @@ router.post("/chat", async (request, response, next) => {
             city: 1,
             publicAddress: 1,
             availability: 1,
+            isRecommended: 1,
             publishedAt: 1,
             updatedAt: 1,
             images: 1,
@@ -848,7 +866,7 @@ router.post("/chat", async (request, response, next) => {
           },
         },
       )
-      .sort({ availability: 1, publishedAt: -1 })
+      .sort({ availability: 1, isRecommended: -1, publishedAt: -1 })
       .limit(100)
       .toArray();
 
@@ -870,6 +888,7 @@ router.post("/chat", async (request, response, next) => {
       dienTichM2: d.areaM2,
       khuVuc: d.publicAddress,
       phuong: d.ward,
+      phongDeXuat: Boolean(d.isRecommended),
       tienNghi: d.amenities || [],
       moTaNgan: String(d.description || "").replace(/\s+/g, " ").trim().slice(0, 140),
       sdtLienHe: d.allowPublicPhone && d.contactPhone ? d.contactPhone : null,

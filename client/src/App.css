@@ -772,6 +772,10 @@ textarea:focus-visible {
   background: #FCFBF8;
 }
 
+.public-room-card.is-recommended {
+  border-color: #F3C7A4;
+}
+
 .card-media-link {
   position: relative;
   display: block;
@@ -816,6 +820,28 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: 8px;
   pointer-events: none;
+}
+
+.card-media-badges-left {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.recommended-badge {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #D97706 0%, #C5532B 100%);
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgb(197 83 43 / 28%);
 }
 
 .card-type-pill {
@@ -1895,11 +1921,15 @@ textarea:focus-visible {
     left: 6px;
     gap: 4px;
   }
-  .card-media-badges .status-badge {
+  .card-media-badges .status-badge,
+  .card-media-badges .recommended-badge {
     min-height: 20px;
     padding: 0 6px;
     gap: 4px;
     font-size: 10px;
+  }
+  .card-media-badges-left {
+    gap: 4px;
   }
   .card-media-badges .status-badge i {
     width: 5px;

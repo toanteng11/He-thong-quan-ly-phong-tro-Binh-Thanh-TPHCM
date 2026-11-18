@@ -3916,6 +3916,51 @@ textarea:focus-visible {
   }
 }
 
+.icon-button.is-recommended-star {
+  color: #D97706;
+  background: #FEF3C7;
+  border-color: #FCD34D;
+}
+
+.icon-button.is-recommended-star:hover:not(:disabled) {
+  color: #B45309;
+  background: #FDE68A;
+  border-color: #F59E0B;
+}
+
+.admin-recommended-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 2px 8px;
+  color: #9A3412;
+  background: #FFEDD5;
+  border: 1px solid #FDBA74;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-recommended-pill.is-dim {
+  opacity: 0.72;
+}
+
+.recommended-counter {
+  color: var(--ink-600);
+  font-size: 12.5px;
+}
+
+.recommended-counter.is-high {
+  color: #B45309;
+}
+
+.button-recommended-active {
+  color: #9A3412;
+  background: #FFEDD5;
+  border: 1px solid #FDBA74;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
