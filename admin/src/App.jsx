@@ -7,6 +7,7 @@ import {
   BINH_THANH_WARDS,
   ROOM_TYPES,
   getMissingImportFields,
+  inferWardFromAddressText,
   parseRoomPostText,
 } from './lib/facebookPostParser.js'
 import './App.css'
@@ -1408,12 +1409,62 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
   }
 
   const update = (key, value) => {
-    setForm((previous) => ({ ...previous, [key]: value }))
+    let autoDetectedWard = ''
+    setForm((previous) => {
+      const next = { ...previous, [key]: value }
+      if ((key === 'privateAddress' || key === 'publicAddress') && !previous.ward) {
+        const probe = inferWardFromAddressText(value)
+        if (probe.ward) {
+          next.ward = probe.ward
+          autoDetectedWard = probe.ward
+        }
+      }
+      return next
+    })
     setFieldErrors((previous) => {
       const next = { ...previous }
       delete next[key]
+      if (autoDetectedWard) delete next.ward
       return next
     })
+  }
+
+  const autoDetectWardFromFields = async () => {
+    const combined = [form.privateAddress, form.publicAddress].filter(Boolean).join(', ').trim()
+    if (!combined) {
+      showNotice('Vui lòng nhập Khu vực hoặc Địa chỉ đầy đủ trước khi tra cứu Phường.', 'info')
+      return
+    }
+    const localResult = inferWardFromAddressText(combined)
+    if (localResult.ward) {
+      setForm((previous) => ({ ...previous, ward: localResult.ward }))
+      setFieldErrors((previous) => {
+        const next = { ...previous }
+        delete next.ward
+        return next
+      })
+      showNotice(localResult.reason || `Đã xác định ${localResult.ward} theo địa chỉ.`)
+      return
+    }
+    setLookingUpWard(true)
+    try {
+      const geo = await api(`/admin/geocode-ward?q=${encodeURIComponent(combined)}`)
+      if (geo?.ward) {
+        setForm((previous) => ({ ...previous, ward: geo.ward }))
+        setFieldErrors((previous) => {
+          const next = { ...previous }
+          delete next.ward
+          return next
+        })
+        showNotice(`Đã xác định ${geo.ward} (2026) từ bản đồ theo địa chỉ.`)
+      } else {
+        showNotice('Chưa tra cứu được phường tự động cho địa chỉ này — bạn vui lòng chọn tay nhé.', 'info')
+      }
+    } catch {
+      showNotice('Không kết nối được dịch vụ tra cứu bản đồ lúc này.', 'info')
+    } finally {
+      setLookingUpWard(false)
+    }
   }
 
   const requestData = () =>
@@ -2079,6 +2130,17 @@ function RoomEditorPage({ roomId, navigate, showNotice }) {
                     <option key={wardName} value={wardName}>{wardName}</option>
                   ))}
                 </select>
+                {(form.privateAddress || form.publicAddress) && (
+                  <button
+                    type="button"
+                    className="link-action"
+                    style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                    onClick={autoDetectWardFromFields}
+                    disabled={lookingUpWard}
+                  >
+                    {lookingUpWard ? 'Đang tra cứu phường…' : 'Tự xác định phường theo số nhà / địa chỉ'}
+                  </button>
+                )}
                 {fieldError('ward')}
                 {missingHint('ward')}
               </label>

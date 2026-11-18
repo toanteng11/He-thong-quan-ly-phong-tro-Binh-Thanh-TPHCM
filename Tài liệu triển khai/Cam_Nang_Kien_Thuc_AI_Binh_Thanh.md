@@ -138,6 +138,18 @@ Khách đi làm hoặc đi học các quận trung tâm rất hay chọn thuê t
 4. **Phường Bình Lợi Trung** *(P.5, P.6, P.11, P.13 cũ)*: Tập trung `Đặng Thùy Trâm`, `Bình Lợi`, `Phạm Văn Đồng`, `Phan Văn Trị`, `Nguyễn Văn Đậu`, `Nơ Trang Long`, `Lê Quang Định`, `Nguyễn Thượng Hiền`, `Hoàng Hoa Thám`, `ĐH Văn Lang CS3`.
 5. **Phường Bình Quới** *(P.27, P.28 cũ)*: Bán đảo Thanh Đa (`Bình Quới`, `Thanh Đa`), nhiều cây xanh ven sông, không gian yên tĩnh, giá mềm.
 
+> *Xem bảng phân đoạn số nhà chi tiết cho các tuyến đường dài đi qua nhiều phường tại [Bang_Tra_Cuu_So_Nha_Phuong_Binh_Thanh_2026.md](file:///d:/h%E1%BB%87%20th%E1%BB%91ng%20qu%E1%BA%A3n%20l%C3%BD%20ph%C3%B2ng%20tr%E1%BB%8D%20Qu%E1%BA%ADn%20B%C3%ACnh%20Th%E1%BA%A1nh%20TPHCM/T%C3%A0i%20li%E1%BB%87u%20tri%E1%BB%83n%20khai/Bang_Tra_Cuu_So_Nha_Phuong_Binh_Thanh_2026.md):*
+> - **Xô Viết Nghệ Tĩnh:** Lẻ `1–299` (P. Gia Định) · Lẻ `301–679` (P. Bình Thạnh) · Lẻ `681–900` & Chẵn `2–900` (P. Thạnh Mỹ Tây) · Lẻ `>900` (P. Bình Quới).
+> - **Điện Biên Phủ:** `1–400` (P. Gia Định) · `>=401` gồm Hutech 475A / Pearl Plaza 561A (P. Thạnh Mỹ Tây).
+> - **Bạch Đằng:** Lẻ `1–399` & Chẵn `2–40` (P. Gia Định) · Chẵn `>=42` & Lẻ `>=401` (P. Bình Thạnh).
+> - **Phan Đăng Lưu:** Lẻ `1–250` (P. Gia Định) · Chẵn `2–68` (P. Bình Thạnh) · Chẵn `>=70` (P. Bình Lợi Trung).
+> - **Lê Quang Định:** Lẻ `1–95` (P. Gia Định) · Chẵn `2–210` (P. Bình Thạnh) · Lẻ `>=97` & Chẵn `>=212` (P. Bình Lợi Trung).
+> - **Nơ Trang Long:** Lẻ `1–135` (P. Gia Định) · Lẻ `137–249` & Chẵn `2–278` (P. Bình Thạnh) · Lẻ `>=251` & Chẵn `>=280` (P. Bình Lợi Trung).
+> - **Phan Văn Trị:** Lẻ `1–269` & Chẵn `2–300` (P. Bình Thạnh) · Lẻ `>=271` & Chẵn `>=302` (P. Bình Lợi Trung).
+> - **Nguyễn Xí:** `1–239` (P. Bình Thạnh) · `>=240` (P. Bình Lợi Trung).
+> - **Hoàng Hoa Thám:** `1–70` (P. Gia Định) · `>=71` (P. Bình Lợi Trung).
+> - **Trường Sa:** `1–30` (P. Thạnh Mỹ Tây) · `>=31` (P. Gia Định).
+
 ### 5.2. Hệ sinh thái Siêu thị, Cửa hàng tiện lợi 24/7, Chợ & Y tế
 - **Siêu thị & TTTM lớn:**
   - **Pearl Plaza** (Điện Biên Phủ, sát D1/D2 — đi bộ từ khu Hutech/UTH/FTU2).

@@ -6,6 +6,7 @@ const { getCollections } = require("../db/mongo");
 const { env } = require("../config/env");
 const { hashPassword, verifyPassword } = require("../security/password");
 const { imageStorage } = require("../storage/image-storage");
+const { lookupWardByAddressLocally } = require("../knowledge/ward-lookup");
 const {
   tokenHash,
   cookieValue,
@@ -462,6 +463,15 @@ router.get("/geocode-ward", async (request, response) => {
   const rawQuery = String(request.query.q || "").trim().slice(0, 300);
   if (!rawQuery) {
     return response.json({ ward: "", rawSuburb: "", source: "none" });
+  }
+
+  const localHit = lookupWardByAddressLocally(rawQuery);
+  if (localHit?.ward) {
+    return response.json({
+      ward: localHit.ward,
+      rawSuburb: localHit.rawSuburb || "",
+      source: localHit.source || "local_table",
+    });
   }
 
   // Bỏ số hẻm (/12) để tăng độ chính xác khi tìm mặt tiền đường trên bản đồ
