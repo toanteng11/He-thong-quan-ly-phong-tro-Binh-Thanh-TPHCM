@@ -1,11 +1,26 @@
 {
+  "headers": [
+    {
+      "source": "/og-banner\\.(jpg|png)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "https://he-thong-quan-ly-phong-tro-binh-thanh.onrender.com/api/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!.*\\.(?:jpg|jpeg|png|svg|ico|webp|css|js|json|txt)$).*)",
       "destination": "/index.html"
     }
   ]
