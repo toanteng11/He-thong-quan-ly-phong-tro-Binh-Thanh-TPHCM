@@ -666,6 +666,20 @@ function PublicCatalogPage({ location, navigate }) {
         <div className="public-container public-hero-grid">
           <div className="public-hero-copy">
             <h1>Tìm phòng trọ Quận Bình Thạnh</h1>
+            <div className="hero-trust-strip" aria-label="Cam kết hệ thống">
+              <span className="hero-trust-badge">
+                <Icon name="check" size={14} /> Ảnh &amp; giá thật 100%
+              </span>
+              <span className="hero-trust-badge">
+                <Icon name="check" size={14} /> Xem phòng miễn phí
+              </span>
+              <span className="hero-trust-badge">
+                <Icon name="shield" size={14} /> Cọc trực tiếp chủ nhà
+              </span>
+              <a href={`tel:${branding.phone}`} className="hero-trust-badge is-contact">
+                <Icon name="phone" size={14} /> Zalo/Hotline: {branding.phoneDisplay}
+              </a>
+            </div>
           </div>
         </div>
       </section>
